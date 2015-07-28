@@ -270,7 +270,7 @@ namespace RobotLocalization
     {
       return;
     }
-
+    lastMessageTime_ = msg->header.stamp;
     RF_DEBUG("------ RosFilter::imuCallback (" << topicName << ") ------\n" <<
              "IMU message:\n" << *msg);
 
@@ -351,6 +351,7 @@ namespace RobotLocalization
       }
 
       filter_.setLastUpdateTime(currentTime);
+      publishState(lastMessageTime_);
     }
     else if (filter_.getInitializedStatus())
     {
@@ -372,6 +373,8 @@ namespace RobotLocalization
         // Update the last measurement time and last update time
         filter_.setLastMeasurementTime(filter_.getLastMeasurementTime() + lastUpdateDelta);
         filter_.setLastUpdateTime(filter_.getLastUpdateTime() + lastUpdateDelta);
+        ros::Time ct;
+        publishState(ct.fromSec(currentTime));
       }
     }
     else
@@ -380,6 +383,81 @@ namespace RobotLocalization
     }
 
     RF_DEBUG("\n----- /RosFilter::integrateMeasurements ------\n");
+  }
+  template<typename T>
+  void RosFilter<T>::publishState(const ros::Time)
+  {
+      // Get latest state and publish it
+      nav_msgs::Odometry filteredPosition;
+
+      if (getFilteredOdometryMessage(filteredPosition))
+      {
+        worldBaseLinkTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
+        worldBaseLinkTransMsg_.header.frame_id = filteredPosition.header.frame_id;
+        worldBaseLinkTransMsg_.child_frame_id = filteredPosition.child_frame_id;
+
+        worldBaseLinkTransMsg_.transform.translation.x = filteredPosition.pose.pose.position.x;
+        worldBaseLinkTransMsg_.transform.translation.y = filteredPosition.pose.pose.position.y;
+        worldBaseLinkTransMsg_.transform.translation.z = filteredPosition.pose.pose.position.z;
+        worldBaseLinkTransMsg_.transform.rotation = filteredPosition.pose.pose.orientation;
+
+        // If the worldFrameId_ is the odomFrameId_ frame, then we can just send the transform. If the
+        // worldFrameId_ is the mapFrameId_ frame, we'll have some work to do.
+        if(filteredPosition.header.frame_id == odomFrameId_)
+        {
+          worldTransformBroadcaster_.sendTransform(worldBaseLinkTransMsg_);
+        }
+        else if(filteredPosition.header.frame_id == mapFrameId_)
+        {
+          try
+          {
+            tf2::Transform worldBaseLinkTrans;
+            tf2::fromMsg(worldBaseLinkTransMsg_.transform, worldBaseLinkTrans);
+
+            tf2::fromMsg(tfBuffer_.lookupTransform(baseLinkFrameId_, odomFrameId_, ros::Time(0)).transform,
+                         odomBaseLinkTrans_);
+
+            /*
+             * First, see these two references:
+             * http://wiki.ros.org/tf/Overview/Using%20Published%20Transforms#lookupTransform
+             * http://wiki.ros.org/geometry/CoordinateFrameConventions#Transform_Direction
+             * We have a transform from mapFrameId_->baseLinkFrameId_, but it would actually transform
+             * a given pose from baseLinkFrameId_->mapFrameId_. We then used lookupTransform, whose
+             * first two arguments are target frame and source frame, to get a transform from
+             * baseLinkFrameId_->odomFrameId_. However, this transform would actually transform data
+             * from odomFrameId_->baseLinkFrameId_. Now imagine that we have a position in the
+             * mapFrameId_ frame. First, we multiply it by the inverse of the
+             * mapFrameId_->baseLinkFrameId, which will transform that data from mapFrameId_ to
+             * baseLinkFrameId_. Now we want to go from baseLinkFrameId_->odomFrameId_, but the
+             * transform we have takes data from odomFrameId_->baseLinkFrameId_, so we need its
+             * inverse as well. We have now transformed our data from mapFrameId_ to odomFrameId_.
+             * However, if we want other users to be able to do the same, we need to broadcast
+             * the inverse of that entire transform.
+            */
+
+            mapOdomTrans_.mult(worldBaseLinkTrans, odomBaseLinkTrans_);
+
+            mapOdomTransMsg_.transform = tf2::toMsg(mapOdomTrans_);
+            mapOdomTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
+            mapOdomTransMsg_.header.frame_id = mapFrameId_;
+            mapOdomTransMsg_.child_frame_id = odomFrameId_;
+
+            worldTransformBroadcaster_.sendTransform(mapOdomTransMsg_);
+          }
+          catch(...)
+          {
+            ROS_ERROR_STREAM("Could not obtain transform from " << odomFrameId_ << "->" << baseLinkFrameId_);
+          }
+        }
+        else
+        {
+          ROS_ERROR_STREAM("Odometry message frame_id was " << filteredPosition.header.frame_id <<
+                           ", expected " << mapFrameId_ << " or " << odomFrameId_);
+        }
+
+        // Fire off the position and the transform
+        positionPub_.publish(filteredPosition);
+      }
   }
 
   template<typename T>
@@ -1177,7 +1255,7 @@ namespace RobotLocalization
     {
       return;
     }
-
+    lastMessageTime_ = msg->header.stamp;
     RF_DEBUG("------ RosFilter::odometryCallback (" << topicName << ") ------\n" <<
              "Odometry message:\n" << *msg);
 
@@ -1306,106 +1384,32 @@ namespace RobotLocalization
                                                            diagnostic_updater::FrequencyStatusParam(&minFrequency,
                                                                                                     &maxFrequency,
                                                                                                     0.1, 10));
-
+    ros::Time lastDiagTime = ros::Time::now();
     // We may need to broadcast a different transform than
     // the one we've already calculated.
-    tf2::Transform mapOdomTrans;
-    tf2::Transform odomBaseLinkTrans;
-    geometry_msgs::TransformStamped mapOdomTransMsg;
-    ros::Time curTime;
-    ros::Time lastDiagTime = ros::Time::now();
-
-    // Clear out the transforms
+       // Clear out the transforms
     worldBaseLinkTransMsg_.transform = tf2::toMsg(tf2::Transform::getIdentity());
-    mapOdomTransMsg.transform = tf2::toMsg(tf2::Transform::getIdentity());
+    mapOdomTransMsg_.transform = tf2::toMsg(tf2::Transform::getIdentity());
 
     // Publisher
-    ros::Publisher positionPub = nh_.advertise<nav_msgs::Odometry>("odometry/filtered", 20);
-    tf2_ros::TransformBroadcaster worldTransformBroadcaster;
+    positionPub_ = nh_.advertise<nav_msgs::Odometry>("odometry/filtered", 20);
+
 
     ros::Rate loop_rate(frequency_);
 
     while (ros::ok())
     {
-      // Get latest state and publish it
-      nav_msgs::Odometry filteredPosition;
-
-      if (getFilteredOdometryMessage(filteredPosition))
-      {
-        worldBaseLinkTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
-        worldBaseLinkTransMsg_.header.frame_id = filteredPosition.header.frame_id;
-        worldBaseLinkTransMsg_.child_frame_id = filteredPosition.child_frame_id;
-
-        worldBaseLinkTransMsg_.transform.translation.x = filteredPosition.pose.pose.position.x;
-        worldBaseLinkTransMsg_.transform.translation.y = filteredPosition.pose.pose.position.y;
-        worldBaseLinkTransMsg_.transform.translation.z = filteredPosition.pose.pose.position.z;
-        worldBaseLinkTransMsg_.transform.rotation = filteredPosition.pose.pose.orientation;
-
-        // If the worldFrameId_ is the odomFrameId_ frame, then we can just send the transform. If the
-        // worldFrameId_ is the mapFrameId_ frame, we'll have some work to do.
-        if(filteredPosition.header.frame_id == odomFrameId_)
-        {
-          worldTransformBroadcaster.sendTransform(worldBaseLinkTransMsg_);
-        }
-        else if(filteredPosition.header.frame_id == mapFrameId_)
-        {
-          try
-          {
-            tf2::Transform worldBaseLinkTrans;
-            tf2::fromMsg(worldBaseLinkTransMsg_.transform, worldBaseLinkTrans);
-
-            tf2::fromMsg(tfBuffer_.lookupTransform(baseLinkFrameId_, odomFrameId_, ros::Time(0)).transform,
-                         odomBaseLinkTrans);
-
-            /*
-             * First, see these two references:
-             * http://wiki.ros.org/tf/Overview/Using%20Published%20Transforms#lookupTransform
-             * http://wiki.ros.org/geometry/CoordinateFrameConventions#Transform_Direction
-             * We have a transform from mapFrameId_->baseLinkFrameId_, but it would actually transform
-             * a given pose from baseLinkFrameId_->mapFrameId_. We then used lookupTransform, whose
-             * first two arguments are target frame and source frame, to get a transform from
-             * baseLinkFrameId_->odomFrameId_. However, this transform would actually transform data
-             * from odomFrameId_->baseLinkFrameId_. Now imagine that we have a position in the
-             * mapFrameId_ frame. First, we multiply it by the inverse of the
-             * mapFrameId_->baseLinkFrameId, which will transform that data from mapFrameId_ to
-             * baseLinkFrameId_. Now we want to go from baseLinkFrameId_->odomFrameId_, but the
-             * transform we have takes data from odomFrameId_->baseLinkFrameId_, so we need its
-             * inverse as well. We have now transformed our data from mapFrameId_ to odomFrameId_.
-             * However, if we want other users to be able to do the same, we need to broadcast
-             * the inverse of that entire transform.
-            */
-
-            mapOdomTrans.mult(worldBaseLinkTrans, odomBaseLinkTrans);
-
-            mapOdomTransMsg.transform = tf2::toMsg(mapOdomTrans);
-            mapOdomTransMsg.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
-            mapOdomTransMsg.header.frame_id = mapFrameId_;
-            mapOdomTransMsg.child_frame_id = odomFrameId_;
-
-            worldTransformBroadcaster.sendTransform(mapOdomTransMsg);
-          }
-          catch(...)
-          {
-            ROS_ERROR_STREAM("Could not obtain transform from " << odomFrameId_ << "->" << baseLinkFrameId_);
-          }
-        }
-        else
-        {
-          ROS_ERROR_STREAM("Odometry message frame_id was " << filteredPosition.header.frame_id <<
-                           ", expected " << mapFrameId_ << " or " << odomFrameId_);
-        }
-
-        // Fire off the position and the transform
-        positionPub.publish(filteredPosition);
-
         if(printDiagnostics_)
         {
           freqDiag.tick();
         }
-      }
+
 
       // The spin will call all the available callbacks and enqueue
       // their received measurements
+      ros::spinOnce();
+      //sleep 1 ms and call spinOnce() again to call the callbacks from the message filters
+      ros::WallDuration(0.001).sleep();
       ros::spinOnce();
 
       // Now we'll integrate any measurements we've received

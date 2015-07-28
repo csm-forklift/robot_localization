@@ -354,6 +354,10 @@ namespace RobotLocalization
                         Eigen::VectorXd &measurement,
                         Eigen::MatrixXd &measurementCovariance);
 
+      //! @brief Publishes the current state vector
+      //! @param[in] stamp - The time stamp to use for the published msg header
+      void publishState(const ros::Time stamp);
+
       //! @brief Vector to hold our acceleration (represented as IMU) message filters so they don't go out of scope.
       //!
       std::map<std::string, imuMFPtr> accelerationMessageFilters_;
@@ -546,6 +550,16 @@ namespace RobotLocalization
       //! @brief tf frame name that is the parent frame of the transform that this node will calculate and broadcast.
       //!
       std::string worldFrameId_;
+
+      tf2::Transform mapOdomTrans_;
+      tf2::Transform odomBaseLinkTrans_;
+      geometry_msgs::TransformStamped mapOdomTransMsg_;
+
+      // Publisher
+      ros::Publisher positionPub_;
+      tf2_ros::TransformBroadcaster worldTransformBroadcaster_;
+
+      ros::Time lastMessageTime_;
 
   };
 }
