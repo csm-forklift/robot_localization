@@ -1387,7 +1387,7 @@ namespace RobotLocalization
     ros::Time lastDiagTime = ros::Time::now();
     // We may need to broadcast a different transform than
     // the one we've already calculated.
-       // Clear out the transforms
+    // Clear out the transforms
     worldBaseLinkTransMsg_.transform = tf2::toMsg(tf2::Transform::getIdentity());
     mapOdomTransMsg_.transform = tf2::toMsg(tf2::Transform::getIdentity());
 
@@ -1401,36 +1401,36 @@ namespace RobotLocalization
     {
         if(printDiagnostics_)
         {
-          freqDiag.tick();
+            freqDiag.tick();
         }
 
 
-      // The spin will call all the available callbacks and enqueue
-      // their received measurements
-      ros::spinOnce();
-      //sleep 1 ms and call spinOnce() again to call the callbacks from the message filters
-      ros::WallDuration(0.001).sleep();
-      ros::spinOnce();
+        // The spin will call all the available callbacks and enqueue
+        // their received measurements
+        ros::spinOnce();
+        //sleep 1 ms and call spinOnce() again to call the callbacks from the message filters
+        ros::WallDuration(0.001).sleep();
+        ros::spinOnce();
 
-      // Now we'll integrate any measurements we've received
-      ros::Time curTime = ros::Time::now();
-      integrateMeasurements(ros::Time::now().toSec());
+        // Now we'll integrate any measurements we've received
+        ros::Time curTime = ros::Time::now();
+        integrateMeasurements(ros::Time::now().toSec());
 
-      /* Diagnostics can behave strangely when playing back from bag
+        /* Diagnostics can behave strangely when playing back from bag
        * files and using simulated time, so we have to check for
        * time suddenly moving backwards as well as the standard
        * timeout criterion before publishing. */
-      double diagDuration = (curTime - lastDiagTime).toSec();
-      if(printDiagnostics_ && (diagDuration >= diagnosticUpdater_.getPeriod() || diagDuration < 0.0))
-      {
-        diagnosticUpdater_.force_update();
-        lastDiagTime = curTime;
-      }
+        double diagDuration = (curTime - lastDiagTime).toSec();
+        if(printDiagnostics_ && (diagDuration >= diagnosticUpdater_.getPeriod() || diagDuration < 0.0))
+        {
+            diagnosticUpdater_.force_update();
+            lastDiagTime = curTime;
+        }
 
-      if(!loop_rate.sleep())
-      {
-        ROS_WARN_STREAM("Failed to meet update rate! Try decreasing the rate, limiting sensor output frequency, or limiting the number of sensors.");
-      }
+        if(!loop_rate.sleep())
+        {
+            ROS_WARN_STREAM("Failed to meet update rate! Try decreasing the rate, limiting sensor output frequency, or limiting the number of sensors.");
+        }
     }
   }
 

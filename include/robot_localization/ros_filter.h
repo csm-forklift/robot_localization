@@ -356,6 +356,7 @@ namespace RobotLocalization
 
       //! @brief Publishes the current state vector
       //! @param[in] stamp - The time stamp to use for the published msg header
+      //!
       void publishState(const ros::Time stamp);
 
       //! @brief Vector to hold our acceleration (represented as IMU) message filters so they don't go out of scope.
@@ -551,15 +552,28 @@ namespace RobotLocalization
       //!
       std::string worldFrameId_;
 
+      //! @brief Publisher to publish the filtered pose
+      //!
+      ros::Publisher positionPub_;
+
+      //! @brief Time stamp of the last input received
+      ros::Time lastMessageTime_;
+
+      //! @brief map to odom transform
+      //!
       tf2::Transform mapOdomTrans_;
+
+      //! @brief odom to BaseLink transform
+      //!
       tf2::Transform odomBaseLinkTrans_;
+
+      //! @brief tf message
+      //!
       geometry_msgs::TransformStamped mapOdomTransMsg_;
 
-      // Publisher
-      ros::Publisher positionPub_;
+      //! @brief tf broadcaster
+      //!
       tf2_ros::TransformBroadcaster worldTransformBroadcaster_;
-
-      ros::Time lastMessageTime_;
 
   };
 }
