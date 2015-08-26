@@ -359,6 +359,16 @@ namespace RobotLocalization
       //!
       void publishState(const ros::Time stamp);
 
+      //! @brief
+      //!
+      //!
+      void integrationLoop();
+
+      //! @brief
+      //!
+      //!
+      void publishLoop();
+
       //! @brief Vector to hold our acceleration (represented as IMU) message filters so they don't go out of scope.
       //!
       std::map<std::string, imuMFPtr> accelerationMessageFilters_;
@@ -556,9 +566,6 @@ namespace RobotLocalization
       //!
       ros::Publisher positionPub_;
 
-      //! @brief Time stamp of the last input received
-      ros::Time lastMessageTime_;
-
       //! @brief map to odom transform
       //!
       tf2::Transform mapOdomTrans_;
@@ -575,6 +582,13 @@ namespace RobotLocalization
       //!
       tf2_ros::TransformBroadcaster worldTransformBroadcaster_;
 
+      //! @brief mutex for the mesurement queue
+      //!
+      boost::mutex measurementQueueMutex_;
+
+      //! @brief condition variable for the measurement queue
+      //!
+      boost::condition_variable measurementQueueInsertion_;
   };
 }
 
