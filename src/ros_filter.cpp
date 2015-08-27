@@ -171,7 +171,7 @@ namespace RobotLocalization
     meas.mahalanobisThresh_ = mahalanobisThresh;
     boost::mutex::scoped_lock lock(measurementQueueMutex_);
     measurementQueue_.push(meas);
-    measurementQueueInsertion_.notify_all();
+    measurementQueueEmpty_.notify_all();
 
   }
 
@@ -344,19 +344,21 @@ namespace RobotLocalization
              << measurementQueue_.size() << " measurements in queue.\n");
 
     // If we have any measurements in the queue, process them
-    if(measurementQueueInsertion_.timed_wait(lock,boost::posix_time::milliseconds(filter_.getSensorTimeout()*1000)))
+    if(measurementQueueEmpty_.timed_wait(lock,boost::posix_time::milliseconds(filter_.getSensorTimeout()*1000)))
     {
       if(!measurementQueue_.empty())
       {
+
         double lastMessageTime;
         while (!measurementQueue_.empty())
         {
           Measurement measurement = measurementQueue_.top();
           measurementQueue_.pop();
-
+          lock.unlock();
           // This will call predict and, if necessary, correct
           filter_.processMeasurement(measurement);
           lastMessageTime = measurement.time_;
+          lock.lock();
         }
 
         filter_.setLastUpdateTime(currentTime);
@@ -383,8 +385,7 @@ namespace RobotLocalization
         // Update the last measurement time and last update time
         filter_.setLastMeasurementTime(filter_.getLastMeasurementTime() + lastUpdateDelta);
         filter_.setLastUpdateTime(filter_.getLastUpdateTime() + lastUpdateDelta);
-        ros::Time ct;
-        publishState(ct.fromSec(currentTime));
+        publishState(ros::Time(currentTime));
       }
     }
     else
@@ -474,12 +475,26 @@ namespace RobotLocalization
   template<typename T>
   void RosFilter<T>::integrationLoop()
   {
-    // ros::WallRate loop_rate(0.001);
+    if(printDiagnostics_)
+    {
+      diagnosticUpdater_.add("Filter diagnostic updater", this, &RosFilter<T>::aggregateDiagnostics);
+    }
+
+    // Set up the frequency diagnostic
+    double minFrequency = frequency_ - 2;
+    double maxFrequency = frequency_ + 2;
+    diagnostic_updater::HeaderlessTopicDiagnostic freqDiag("odometry/filtered",
+                                                           diagnosticUpdater_,
+                                                           diagnostic_updater::FrequencyStatusParam(&minFrequency,
+                                                                                                    &maxFrequency,
+                                                                                                    0.1, 10));
+    ros::Time lastDiagTime = ros::Time::now();
+
      while (ros::ok())
      {
          if(printDiagnostics_)
          {
-             //freqDiag.tick();
+             freqDiag.tick();
          }
          // Now we'll integrate any measurements we've received
          ros::Time curTime = ros::Time::now();
@@ -489,17 +504,13 @@ namespace RobotLocalization
         * files and using simulated time, so we have to check for
         * time suddenly moving backwards as well as the standard
         * timeout criterion before publishing. */
-         /*double diagDuration = 0;(curTime - lastDiagTime).toSec();
+         double diagDuration = 0;(curTime - lastDiagTime).toSec();
          if(printDiagnostics_ && (diagDuration >= diagnosticUpdater_.getPeriod() || diagDuration < 0.0))
          {
              diagnosticUpdater_.force_update();
              lastDiagTime = curTime;
-         }*/
+         }
 
-       /*  if(!loop_rate.sleep())
-         {
-             ROS_WARN_STREAM("Failed to meet update rate! Try decreasing the rate, limiting sensor output frequency, or limiting the number of sensors.");
-         }*/
      }
   }
 
@@ -1414,20 +1425,6 @@ namespace RobotLocalization
 
     loadParams();
 
-    if(printDiagnostics_)
-    {
-      diagnosticUpdater_.add("Filter diagnostic updater", this, &RosFilter<T>::aggregateDiagnostics);
-    }
-
-    // Set up the frequency diagnostic
-    double minFrequency = frequency_ - 2;
-    double maxFrequency = frequency_ + 2;
-    diagnostic_updater::HeaderlessTopicDiagnostic freqDiag("odometry/filtered",
-                                                           diagnosticUpdater_,
-                                                           diagnostic_updater::FrequencyStatusParam(&minFrequency,
-                                                                                                    &maxFrequency,
-                                                                                                    0.1, 10));
-    ros::Time lastDiagTime = ros::Time::now();
     // We may need to broadcast a different transform than
     // the one we've already calculated.
     // Clear out the transforms
@@ -1437,49 +1434,12 @@ namespace RobotLocalization
     // Publisher
     positionPub_ = nh_.advertise<nav_msgs::Odometry>("odometry/filtered", 20);
 
-
-    //ros::WallRate loop_rate(frequency_);
     boost::thread(&RosFilter<T>::integrationLoop, this);
-    //boost::thread(boost::bind(&GraphManager::optimizationLoop, this));
+
     while (ros::ok())
     {
-        if(printDiagnostics_)
-        {
-            freqDiag.tick();
-        }
-
-
-        // The spin will call all the available callbacks and enqueue
-        // their received measurements
-        //ros::spinOnce();
+        //Not sure how to figure out what's the wait duration, currently going with 5ms
         ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(0.005));
-        //sleep 1 ms and call spinOnce() again to call the callbacks from the message filters
-        //ros::WallDuration(0.001).sleep();
-
-        //If one of the callbacks executed in spinOnce sent a message via the message filters,
-        //the corresponding callback might not be added to the callback queue in time to be executed
-        //in the same spinOnce. So do another pass on the queue with a wait of 3ms for callbacks to be available
-       // ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(0.001));
-
-        // Now we'll integrate any measurements we've received
-        //ros::Time curTime = ros::Time::now();
-        //integrateMeasurements(ros::Time::now().toSec());
-
-        /* Diagnostics can behave strangely when playing back from bag
-       * files and using simulated time, so we have to check for
-       * time suddenly moving backwards as well as the standard
-       * timeout criterion before publishing. */
-        /*double diagDuration = (curTime - lastDiagTime).toSec();
-        if(printDiagnostics_ && (diagDuration >= diagnosticUpdater_.getPeriod() || diagDuration < 0.0))
-        {
-            diagnosticUpdater_.force_update();
-            lastDiagTime = curTime;
-        }*/
-
-       /* if(!loop_rate.sleep())
-        {
-            ROS_WARN_STREAM("Failed to meet update rate! Try decreasing the rate, limiting sensor output frequency, or limiting the number of sensors.");
-        }*/
     }
   }
 
@@ -1497,9 +1457,12 @@ namespace RobotLocalization
 
     // Clear out the measurement queue so that we don't immediately undo our
     // reset.
-    while(!measurementQueue_.empty())
     {
-      measurementQueue_.pop();
+      boost::mutex::scoped_lock lock(measurementQueueMutex_);
+      while(!measurementQueue_.empty())
+      {
+        measurementQueue_.pop();
+      }
     }
 
     // Also set the last set pose time, so we ignore all messages

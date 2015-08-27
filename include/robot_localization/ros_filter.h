@@ -359,15 +359,9 @@ namespace RobotLocalization
       //!
       void publishState(const ros::Time stamp);
 
-      //! @brief
-      //!
+      //! @brief integrates the measurements in the queue and publishes the result
       //!
       void integrationLoop();
-
-      //! @brief
-      //!
-      //!
-      void publishLoop();
 
       //! @brief Vector to hold our acceleration (represented as IMU) message filters so they don't go out of scope.
       //!
@@ -588,7 +582,7 @@ namespace RobotLocalization
 
       //! @brief condition variable for the measurement queue
       //!
-      boost::condition_variable measurementQueueInsertion_;
+      boost::condition_variable measurementQueueEmpty_;
   };
 }
 
