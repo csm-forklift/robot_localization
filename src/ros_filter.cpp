@@ -475,14 +475,10 @@ namespace RobotLocalization
   template<typename T>
   void RosFilter<T>::integrationLoop()
   {
-    if(printDiagnostics_)
-    {
-      diagnosticUpdater_.add("Filter diagnostic updater", this, &RosFilter<T>::aggregateDiagnostics);
-    }
-
+    // Not quite sure how to set the limits on the frequency in this case
     // Set up the frequency diagnostic
-    double minFrequency = frequency_ - 2;
-    double maxFrequency = frequency_ + 2;
+    double minFrequency = frequency_ - 20;
+    double maxFrequency = frequency_ + 20;
     diagnostic_updater::HeaderlessTopicDiagnostic freqDiag("odometry/filtered",
                                                            diagnosticUpdater_,
                                                            diagnostic_updater::FrequencyStatusParam(&minFrequency,
@@ -504,7 +500,7 @@ namespace RobotLocalization
         * files and using simulated time, so we have to check for
         * time suddenly moving backwards as well as the standard
         * timeout criterion before publishing. */
-         double diagDuration = 0;(curTime - lastDiagTime).toSec();
+         double diagDuration = (curTime - lastDiagTime).toSec();
          if(printDiagnostics_ && (diagDuration >= diagnosticUpdater_.getPeriod() || diagDuration < 0.0))
          {
              diagnosticUpdater_.force_update();
@@ -1424,6 +1420,12 @@ namespace RobotLocalization
     ros::Time::init();
 
     loadParams();
+
+    if(printDiagnostics_)
+    {
+      diagnosticUpdater_.add("Filter diagnostic updater", this, &RosFilter<T>::aggregateDiagnostics);
+    }
+
 
     // We may need to broadcast a different transform than
     // the one we've already calculated.
