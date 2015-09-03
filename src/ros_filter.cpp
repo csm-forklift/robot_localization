@@ -404,10 +404,6 @@ namespace RobotLocalization
 
       if (getFilteredOdometryMessage(filteredPosition))
       {
-        worldBaseLinkTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
-        worldBaseLinkTransMsg_.header.frame_id = filteredPosition.header.frame_id;
-        worldBaseLinkTransMsg_.child_frame_id = filteredPosition.child_frame_id;
-
         worldBaseLinkTransMsg_.transform.translation.x = filteredPosition.pose.pose.position.x;
         worldBaseLinkTransMsg_.transform.translation.y = filteredPosition.pose.pose.position.y;
         worldBaseLinkTransMsg_.transform.translation.z = filteredPosition.pose.pose.position.z;
@@ -417,6 +413,9 @@ namespace RobotLocalization
         // worldFrameId_ is the mapFrameId_ frame, we'll have some work to do.
         if(filteredPosition.header.frame_id == odomFrameId_)
         {
+          worldBaseLinkTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
+          worldBaseLinkTransMsg_.header.frame_id = filteredPosition.header.frame_id;
+          worldBaseLinkTransMsg_.child_frame_id = filteredPosition.child_frame_id;
           worldTransformBroadcaster_.sendTransform(worldBaseLinkTransMsg_);
         }
         else if(filteredPosition.header.frame_id == mapFrameId_)
@@ -477,8 +476,8 @@ namespace RobotLocalization
   {
     // Not quite sure how to set the limits on the frequency in this case
     // Set up the frequency diagnostic
-    double minFrequency = frequency_ - 20;
-    double maxFrequency = frequency_ + 20;
+    double minFrequency = frequency_ - 50;
+    double maxFrequency = frequency_ + 50;
     diagnostic_updater::HeaderlessTopicDiagnostic freqDiag("odometry/filtered",
                                                            diagnosticUpdater_,
                                                            diagnostic_updater::FrequencyStatusParam(&minFrequency,
