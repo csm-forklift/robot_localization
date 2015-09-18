@@ -357,6 +357,15 @@ template<class T> class RosFilter
                       Eigen::VectorXd &measurement,
                       Eigen::MatrixXd &measurementCovariance);
 
+     //! @brief Publishes the current state vector
+     //! @param[in] stamp - The time stamp to use for the published msg header
+     //!
+     void publishState(const ros::Time stamp);
+
+     //! @brief integrates the measurements in the queue and publishes the result
+     //!
+     void integrationLoop();
+
     //! @brief Vector to hold our acceleration (represented as IMU) message filters so they don't go out of scope.
     //!
     std::map<std::string, imuMFPtr> accelerationMessageFilters_;
@@ -549,8 +558,35 @@ template<class T> class RosFilter
     //! @brief tf frame name that is the parent frame of the transform that this node will calculate and broadcast.
     //!
     std::string worldFrameId_;
-};
 
+    //! @brief Publisher to publish the filtered pose
+    //!
+    ros::Publisher positionPub_;
+
+    //! @brief map to odom transform
+    //!
+    tf2::Transform mapOdomTrans_;
+
+    //! @brief odom to BaseLink transform
+    //!
+    tf2::Transform odomBaseLinkTrans_;
+
+    //! @brief tf message
+    //!
+    geometry_msgs::TransformStamped mapOdomTransMsg_;
+
+    //! @brief tf broadcaster
+    //!
+    tf2_ros::TransformBroadcaster worldTransformBroadcaster_;
+
+    //! @brief mutex for the mesurement queue
+    //!
+    boost::mutex measurementQueueMutex_;
+
+    //! @brief condition variable for the measurement queue
+    //!
+    boost::condition_variable measurementQueueEmpty_;
+  };
 }  // namespace RobotLocalization
 
 #endif  // ROBOT_LOCALIZATION_ROS_FILTER_H
