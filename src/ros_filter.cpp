@@ -396,10 +396,14 @@ namespace RobotLocalization
           filter_.processMeasurement(measurement);
           lastMessageTime = measurement.time_;
           lock.lock();
+          if (!measurementQueue_.empty())
+            if (measurementQueue_.top().time_ == lastMessageTime)
+              continue;
+          lock.unlock();
+          filter_.setLastUpdateTime(currentTime);
+          publishState(ros::Time(lastMessageTime));
+          lock.lock();
         }
-
-        filter_.setLastUpdateTime(currentTime);
-        publishState(ros::Time(lastMessageTime));
       }
     }
     else if (filter_.getInitializedStatus())
