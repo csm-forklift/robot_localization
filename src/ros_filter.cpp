@@ -183,7 +183,7 @@ namespace RobotLocalization
     meas.mahalanobisThresh_ = mahalanobisThresh;
     boost::mutex::scoped_lock lock(measurementQueueMutex_);
     measurementQueue_.push(meas);
-    measurementQueueEmpty_.notify_all();
+    measurementsReady_.notify_all();
 
   }
 
@@ -391,7 +391,7 @@ namespace RobotLocalization
              << measurementQueue_.size() << " measurements in queue.\n");
 
     // If we have any measurements in the queue, process them
-    if(measurementQueueEmpty_.timed_wait(lock,boost::posix_time::milliseconds(filter_.getSensorTimeout()*1000)))
+    if(measurementsReady_.timed_wait(lock,boost::posix_time::milliseconds(filter_.getSensorTimeout()*1000)))
     {
       if(!measurementQueue_.empty())
       {
@@ -401,15 +401,19 @@ namespace RobotLocalization
         {
           Measurement measurement = measurementQueue_.top();
           measurementQueue_.pop();
+          bool queueEmpty = measurementQueue_.empty();
+          double nextMeasurementTime = 0;
+          if(!queueEmpty)
+          {
+            nextMeasurementTime = measurementQueue_.top().time_;
+          }
           lock.unlock();
           // This will call predict and, if necessary, correct
           filter_.processMeasurement(measurement);
           lastMessageTime = measurement.time_;
-          lock.lock();
-          if (!measurementQueue_.empty())
-            if (measurementQueue_.top().time_ == lastMessageTime)
-              continue;
-          lock.unlock();
+          // If the next measurement comes from the same message don't publish
+          if (nextMeasurementTime == lastMessageTime)
+            continue;
           filter_.setLastUpdateTime(currentTime);
           publishState(ros::Time(lastMessageTime));
           lock.lock();
@@ -448,7 +452,7 @@ namespace RobotLocalization
   }
 
   template<typename T>
-  void RosFilter<T>::publishState(const ros::Time)
+  void RosFilter<T>::publishState(const ros::Time& stamp)
   {
       // Get latest state and publish it
       nav_msgs::Odometry filteredPosition;
@@ -506,9 +510,9 @@ namespace RobotLocalization
 
             worldTransformBroadcaster_.sendTransform(mapOdomTransMsg_);
           }
-          catch(...)
+          catch(tf2::TransformException ex)
           {
-            ROS_ERROR_STREAM("Could not obtain transform from " << odomFrameId_ << "->" << baseLinkFrameId_);
+            ROS_ERROR_STREAM("Could not obtain transform from " << odomFrameId_ << "->" << baseLinkFrameId_<<" "<<ex.what());
           }
         }
         else
@@ -518,7 +522,7 @@ namespace RobotLocalization
         }
 
         // Fire off the position and the transform
-        positionPub_.publish(filteredPosition);
+        odometryPub_.publish(filteredPosition);
       }
   }
 
@@ -544,7 +548,7 @@ namespace RobotLocalization
          }
          // Now we'll integrate any measurements we've received
          ros::Time curTime = ros::Time::now();
-         integrateMeasurements(ros::Time::now().toSec());
+         integrateMeasurements(curTime.now().toSec());
 
          /* Diagnostics can behave strangely when playing back from bag
         * files and using simulated time, so we have to check for
@@ -1645,7 +1649,7 @@ namespace RobotLocalization
     mapOdomTransMsg_.transform = tf2::toMsg(tf2::Transform::getIdentity());
 
     // Publisher
-    positionPub_ = nh_.advertise<nav_msgs::Odometry>("odometry/filtered", 20);
+    odometryPub_ = nh_.advertise<nav_msgs::Odometry>("odometry/filtered", 20);
 
     boost::thread(&RosFilter<T>::integrationLoop, this);
 
