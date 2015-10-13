@@ -340,7 +340,7 @@ template<class T> class RosFilter
      //! @brief Publishes the current state vector
      //! @param[in] stamp - The time stamp to use for the published msg header
      //!
-     void publishState(const ros::Time stamp);
+     void publishState(const ros::Time& stamp);
 
      //! @brief integrates the measurements in the queue and publishes the result
      //!
@@ -519,7 +519,7 @@ template<class T> class RosFilter
 
     //! @brief Publisher to publish the filtered pose
     //!
-    ros::Publisher positionPub_;
+    ros::Publisher odometryPub_;
 
     //! @brief map to odom transform
     //!
@@ -543,7 +543,7 @@ template<class T> class RosFilter
 
     //! @brief condition variable for the measurement queue
     //!
-    boost::condition_variable measurementQueueEmpty_;
+    boost::condition_variable measurementsReady_;
   };
 }  // namespace RobotLocalization
 
