@@ -402,10 +402,11 @@ namespace RobotLocalization
           filter_.processMeasurement(measurement);
           lastMessageTime = measurement.time_;
           // If the next measurement comes from the same message don't publish
-          if (nextMeasurementTime == lastMessageTime)
-            continue;
-          filter_.setLastUpdateTime(currentTime);
-          publishState(ros::Time(lastMessageTime));
+          if (nextMeasurementTime != lastMessageTime)
+          {
+            filter_.setLastUpdateTime(currentTime);
+            publishState(ros::Time(lastMessageTime));
+          }
           lock.lock();
         }
       }
