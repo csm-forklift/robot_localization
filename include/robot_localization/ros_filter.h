@@ -587,7 +587,8 @@ template<class T> class RosFilter
     //!
     boost::condition_variable measurementsReady_;
 
-    //! @brief mutex for diagnostic maps
+    //! @brief mutex for diagnostic maps. This guards staticDiagnostics_ and dynamicDiagnostics_ from
+    //! simultaneous updates in addDiagnostic and aggregateDiagnostics.
     //!
     boost::mutex diagnosticMapsMutex_;
 
