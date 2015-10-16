@@ -1602,6 +1602,7 @@ namespace RobotLocalization
   {
     // This mutex prevents aggregateDiagnostics and addDiagnostic from clashing
     boost::mutex::scoped_lock lock(diagnosticMapsMutex_);
+
     wrapper.clear();
     wrapper.clearSummary();
 
