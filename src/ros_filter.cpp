@@ -1425,7 +1425,7 @@ namespace RobotLocalization
       diagnosticUpdater_.add("Filter diagnostic updater", this, &RosFilter<T>::aggregateDiagnostics);
     }
 
-    
+
     // We may need to broadcast a different transform than
     // the one we've already calculated.
         // Clear out the transforms
@@ -1582,6 +1582,9 @@ namespace RobotLocalization
                                    const std::string &message,
                                    const bool staticDiag)
   {
+    // This mutex prevents aggregateDiagnostics and addDiagnostic from clashing
+    boost::mutex::scoped_lock lock(diagnosticMapsMutex_);
+
     if (staticDiag)
     {
       staticDiagnostics_[topicAndClass] = message;
@@ -1597,6 +1600,8 @@ namespace RobotLocalization
   template<typename T>
   void RosFilter<T>::aggregateDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &wrapper)
   {
+    // This mutex prevents aggregateDiagnostics and addDiagnostic from clashing
+    boost::mutex::scoped_lock lock(diagnosticMapsMutex_);
     wrapper.clear();
     wrapper.clearSummary();
 
