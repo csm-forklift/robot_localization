@@ -586,6 +586,11 @@ template<class T> class RosFilter
     //! @brief condition variable for the measurement queue
     //!
     boost::condition_variable measurementsReady_;
+
+    //! @brief mutex for diagnostic maps
+    //!
+    boost::mutex diagnosticMapsMutex_;
+
   };
 }  // namespace RobotLocalization
 
