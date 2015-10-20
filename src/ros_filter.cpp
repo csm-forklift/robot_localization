@@ -692,6 +692,7 @@ namespace RobotLocalization
              "\nodom_frame is " << odomFrameId_ <<
              "\nbase_link_frame is " << baseLinkFrameId_ <<
              "\nworld_frame is " << worldFrameId_ <<
+             "\npublish_tf is " << publishTransform_ <<
              "\ntransform_time_offset is " << tfTimeOffset_.toSec() <<
              "\nfrequency is " << frequency_ <<
              "\nsensor_timeout is " << filter_.getSensorTimeout() <<
