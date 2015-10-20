@@ -504,7 +504,7 @@ namespace RobotLocalization
 
               worldTransformBroadcaster_.sendTransform(mapOdomTransMsg_);
             }
-            catch(tf2::TransformException ex)
+            catch(const tf2::TransformException &ex)
             {
               ROS_ERROR_STREAM("Could not obtain transform from " << odomFrameId_ << "->" << baseLinkFrameId_<<" "<<ex.what());
             }
