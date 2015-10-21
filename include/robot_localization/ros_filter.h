@@ -496,6 +496,10 @@ template<class T> class RosFilter
     //!
     bool printDiagnostics_;
 
+    //! @brief Whether we publish the transform from the world_frame to the base_link_frame
+    //!
+    bool publishTransform_;
+
     //! @brief If including acceleration for each IMU input, whether or not we remove acceleration due to gravity
     //!
     std::map<std::string, bool> removeGravitationalAcc_;
