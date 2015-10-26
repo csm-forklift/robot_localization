@@ -65,6 +65,25 @@ namespace FilterUtilities
   //!
   void appendPrefix(std::string tfPrefix, std::string &frameId);
 
+  //! @brief Compute covariance volume
+  //!
+  //! Compute the volume of a covariance matrix as its determinant, which is
+  //! computed as the product of the matrix eigenvalues.
+  //!
+  //! If the determinant cannot be computed, the volume returned is +Inf.
+  //!
+  //! @return Volume
+  //!
+  template <typename T, int N>
+  T computeCovarianceVolume(const Eigen::Matrix<T, N, N>& M)
+  {
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix<T, N, N> > eigensolver(M);
+
+    return eigensolver.info() == Eigen::Success ?
+           eigensolver.eigenvalues().prod() :
+           std::numeric_limits<T>::infinity();
+  }
+
 }  // namespace FilterUtilities
 }  // namespace RobotLocalization
 

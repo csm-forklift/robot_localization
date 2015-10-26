@@ -277,7 +277,7 @@ template<class T> class RosFilter
     //! why it requires more parameters than just the covariance containers.
     //! @param[in] arr - The source array for the covariance data
     //! @param[in] covariance - The destination matrix for the covariance data
-    //! @param[in] topicName - The name of the source data topic (for debug purposes)
+    //! @param[in] topicName - The name of the source data topic
     //! @param[in] updateVector - The update vector for the source topic
     //! @param[in] offset - The "starting" location within the array/update vector
     //! @param[in] dimension - The number of values to copy, starting at the offset
