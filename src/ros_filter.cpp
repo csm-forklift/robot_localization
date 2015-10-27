@@ -1975,27 +1975,39 @@ namespace RobotLocalization
       for (size_t j = 0; j < dimension; j++)
       {
         covariance(i, j) = arr[dimension * i + j];
+      }
+    }
 
+    for (size_t i = 0; i < dimension; i++)
+    {
+      for (size_t j = 0; j < dimension; j++)
+      {
         if (printDiagnostics_)
         {
+          if (previousMeasurementCovariances_.count(topicName) > 0)
+          {
+            const Eigen::MatrixXd& previousCovariance = previousMeasurementCovariances_[topicName];
+
+            const double previousVolume = FilterUtilities::computeCovarianceVolume(previousCovariance);
+            const double volume = FilterUtilities::computeCovarianceVolume(covariance);
+
+            if (volume - previousVolume > 1e2)
+            {
+              std::stringstream stream;
+              stream << "The covariance volume (" << volume <<
+                  ") has grown too much wrt the previous volume (" << previousVolume <<
+                  "). This may produce undesirable results.";
+
+              addDiagnostic(diagnostic_msgs::DiagnosticStatus::WARN,
+                            topicName + "_covariance",
+                            stream.str(),
+                            false);
+            }
+          }
+
           std::string iVar = stateVariableNames_[offset + i];
 
-          if (covariance(i, j) > 1e3 && (updateVector[offset  + i] || updateVector[offset  + j]))
-          {
-            std::string jVar = stateVariableNames_[offset + j];
-
-            std::stringstream stream;
-            stream << "The covariance at position (" << dimension * i + j << "), which corresponds to " <<
-                (i == j ? iVar + " variance" : iVar + " and " + jVar + " covariance") <<
-                ", the value is extremely large (" << covariance(i, j) << "), but the update vector for " <<
-                (i == j ? iVar : iVar + " and/or " + jVar) << " is set to true. This may produce undesirable results.";
-
-            addDiagnostic(diagnostic_msgs::DiagnosticStatus::WARN,
-                          topicName + "_covariance",
-                          stream.str(),
-                          false);
-          }
-          else if (updateVector[i] && i == j && covariance(i, j) == 0)
+          if (updateVector[i] && i == j && covariance(i, j) == 0)
           {
             std::stringstream stream;
             stream << "The covariance at position (" << dimension * i + j << "), which corresponds to " <<
@@ -2545,10 +2557,6 @@ namespace RobotLocalization
                                  measurementCovariance);
         }
 
-        // 7f. Update the previous measurement and measurement covariance
-        previousMeasurements_[topicName] = curMeasurement;
-        previousMeasurementCovariances_[topicName] = covariance;
-
         retVal = success;
       }
       else
@@ -2591,6 +2599,10 @@ namespace RobotLocalization
 
         retVal = true;
       }
+
+      // 9. Update the previous measurement and measurement covariance
+      previousMeasurements_[topicName] = curMeasurement;
+      previousMeasurementCovariances_[topicName] = covariance;
     }
     else
     {
