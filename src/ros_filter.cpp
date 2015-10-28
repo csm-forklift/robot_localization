@@ -699,6 +699,42 @@ namespace RobotLocalization
              "\ntwo_d_mode is " << (twoDMode_ ? "true" : "false") <<
              "\nprint_diagnostics is " << (printDiagnostics_ ? "true" : "false") << "\n");
 
+    // Wait for baseLinkFrameId_ to odomFrameId_ (base_link->odom) transform to
+    // be available if the worldFrameId_ == mapFrameId_; when the
+    // worldFrameId_ == odomFrameId_, the base_link->odom transform is
+    // broadcasted by this node:
+    if (worldFrameId_ == mapFrameId_)
+    {
+      size_t tries = 0;
+      const double timeout = 3.0;
+      while (!tfBuffer_.canTransform(baseLinkFrameId_, odomFrameId_, ros::Time(0), ros::Duration(timeout)))
+      {
+        ++tries;
+
+        std::stringstream stream;
+        stream << "Waiting for " << baseLinkFrameId_ << "->" << odomFrameId_
+               << " transform to become available... ("
+               << timeout * tries << "s)";
+
+        const ros::console::levels::Level log_level =
+             tries <  5 ? ros::console::levels::Debug :
+            (tries < 10 ? ros::console::levels::Warn  :
+                          ros::console::levels::Error);
+
+        const int diagnostic_status =
+              tries <  5 ? diagnostic_msgs::DiagnosticStatus::OK   :
+             (tries < 10 ? diagnostic_msgs::DiagnosticStatus::WARN :
+                           diagnostic_msgs::DiagnosticStatus::ERROR);
+
+        ROS_LOG(log_level, ROSCONSOLE_DEFAULT_NAME, stream.str().c_str());
+
+        addDiagnostic(diagnostic_status,
+                      baseLinkFrameId_ + "->" + odomFrameId_ + "_transform",
+                      stream.str(),
+                      true);
+      }
+    }
+
     // Create a subscriber for manually setting/resetting pose
     setPoseSub_ = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("set_pose",
                                                                           1,
