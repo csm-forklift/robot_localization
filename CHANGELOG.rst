@@ -2,8 +2,8 @@
 Changelog for package robot_localization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+2.2.2 (2015-10-30)
+------------------
 * Merge pull request `#12 <https://github.com/clearpathrobotics/robot_localization/issues/12>`_ from clearpathrobotics/CORE-2288-catch-lock-error
   Waiting for worker thread to join main thread before destroying the object.
 * Waiting for worker thread to join main thread before destroying the object.
