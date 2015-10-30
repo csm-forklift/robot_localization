@@ -1479,13 +1479,17 @@ namespace RobotLocalization
     // Publisher
     odometryPub_ = nh_.advertise<nav_msgs::Odometry>("odometry/filtered", 20);
 
-    boost::thread(&RosFilter<T>::integrationLoop, this);
+    boost::thread integrationLoopThread(&RosFilter<T>::integrationLoop, this);
 
     while (ros::ok())
     {
         //Not sure how to figure out what's the wait duration, currently going with 5ms
         ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(0.005));
     }
+
+    // Wait for thread to join so we can be sure the thread does not make
+    // method calls on this object after this object has been destroyed
+    integrationLoopThread.join();
   }
 
   template<typename T>
