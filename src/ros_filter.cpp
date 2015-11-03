@@ -726,7 +726,7 @@ namespace RobotLocalization
              (tries < 10 ? diagnostic_msgs::DiagnosticStatus::WARN :
                            diagnostic_msgs::DiagnosticStatus::ERROR);
 
-        ROS_LOG(log_level, ROSCONSOLE_DEFAULT_NAME, stream.str().c_str());
+        ROS_LOG(log_level, ROSCONSOLE_DEFAULT_NAME, "%s", stream.str().c_str());
 
         addDiagnostic(diagnostic_status,
                       baseLinkFrameId_ + "->" + odomFrameId_ + "_transform",
