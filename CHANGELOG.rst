@@ -2,8 +2,8 @@
 Changelog for package robot_localization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+2.2.3 (2015-11-03)
+------------------
 * Merge pull request `#13 <https://github.com/clearpathrobotics/robot_localization/issues/13>`_ from clearpathrobotics/CORE-2308-format
   Added format to ROS_LOG so the code compiles with -Werror=format-security
 * Removed unneeded IDE temporary file
