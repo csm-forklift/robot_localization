@@ -2,6 +2,14 @@
 Changelog for package robot_localization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#13 <https://github.com/clearpathrobotics/robot_localization/issues/13>`_ from clearpathrobotics/CORE-2308-format
+  Added format to ROS_LOG so the code compiles with -Werror=format-security
+* Removed unneeded IDE temporary file
+  Added format to ROS_LOG so the code compiles with -Werror=format-security
+* Contributors: Jason Mercer
+
 2.2.2 (2015-10-30)
 ------------------
 * Merge pull request `#12 <https://github.com/clearpathrobotics/robot_localization/issues/12>`_ from clearpathrobotics/CORE-2288-catch-lock-error
