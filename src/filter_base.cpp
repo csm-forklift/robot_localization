@@ -50,7 +50,9 @@ namespace RobotLocalization
     processNoiseCovariance_(STATE_SIZE, STATE_SIZE),
     identity_(STATE_SIZE, STATE_SIZE),
     debug_(false),
-    debugStream_(NULL)
+    debugStream_(NULL),
+    enableProcessNoiseCovarianceScaler_(false),
+    processNoiseCovarianceScaler_(0.0)
   {
     initialized_ = false;
 
@@ -265,6 +267,12 @@ namespace RobotLocalization
   void FilterBase::setProcessNoiseCovariance(const Eigen::MatrixXd &processNoiseCovariance)
   {
     processNoiseCovariance_ = processNoiseCovariance;
+  }
+
+  void FilterBase::setProcessNoiseCovarianceScaling(const bool enable, const double processNoiseCovarianceScaler)
+  {
+    enableProcessNoiseCovarianceScaler_ = enable;
+    processNoiseCovarianceScaler_ = processNoiseCovarianceScaler;
   }
 
   void FilterBase::setSensorTimeout(const double sensorTimeout)

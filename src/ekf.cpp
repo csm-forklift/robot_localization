@@ -362,7 +362,26 @@ namespace RobotLocalization
     estimateErrorCovariance_ = (transferFunctionJacobian_ *
                                 estimateErrorCovariance_ *
                                 transferFunctionJacobian_.transpose());
-    estimateErrorCovariance_.noalias() += (processNoiseCovariance_ * delta);
+
+    // Compute processNoiseCovariance scaling if nessesary
+    Eigen::MatrixXd processNoiseCovariance = processNoiseCovariance_;
+    if (enableProcessNoiseCovarianceScaler_)
+    {
+      // Scale covariance in the direction of the velocity vector
+      Eigen::MatrixXd velScaler = state_.segment<6>(StateMemberVx).asDiagonal() * processNoiseCovarianceScaler_;
+
+      Eigen::Matrix3d R = (Eigen::AngleAxisd(state_(StateMemberRoll), Eigen::Vector3d::UnitX())
+             * Eigen::AngleAxisd(state_(StateMemberPitch), Eigen::Vector3d::UnitY())
+             * Eigen::AngleAxisd(state_(StateMemberYaw), Eigen::Vector3d::UnitZ())).matrix();
+
+      Eigen::MatrixXd rotation = Eigen::MatrixXd::Identity(6,6);
+      rotation << R, Eigen::Matrix3d::Zero(),
+                  Eigen::Matrix3d::Zero(), R;
+
+      velScaler  = rotation*velScaler*rotation.transpose();
+      processNoiseCovariance.block<6,6>(StateMemberX,StateMemberX) = velScaler*processNoiseCovariance_.block<6,6>(StateMemberX,StateMemberX)*velScaler.transpose();
+    }
+    estimateErrorCovariance_.noalias() += (processNoiseCovariance * delta);
 
     FB_DEBUG("Predicted estimate error covariance is:\n" << estimateErrorCovariance_ <<
              "\n\n--------------------- /Ekf::predict ----------------------\n");

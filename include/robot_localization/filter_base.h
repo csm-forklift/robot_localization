@@ -222,6 +222,15 @@ class FilterBase
     //!
     void setProcessNoiseCovariance(const Eigen::MatrixXd &processNoiseCovariance);
 
+    //! @brief Sets scaling factor for process covariance based on velocity 
+    //!
+    //! This enables scaling the process covariance matrix by the velocity * the scaling factor
+    //!
+    //! @param[in] enable - enables process covariance scaling by velocity
+    //! @param[in] processNoiseCovarianceScaler - scaling factor for the processCovariance*velocity*processNoiseCovarianceScaler
+    //!
+    void setProcessNoiseCovarianceScaling(const bool enable, const double processNoiseCovarianceScaler = 0);
+
     //! @brief Sets the sensor timeout
     //!
     //! @param[in] sensorTimeout - The time, in seconds, for a sensor to be
@@ -308,6 +317,12 @@ class FilterBase
     //! (times deltaT) to the state estimate covariance matrix.
     //!
     Eigen::MatrixXd processNoiseCovariance_;
+
+    //! @brief Scaling factor to scale the processNoiseCovariance by the velocity
+    double processNoiseCovarianceScaler_;
+
+    //! @brief Whether process covariance scaling is enabled
+    bool enableProcessNoiseCovarianceScaler_;
 
     //! @brief The updates to the filter - both predict and correct - are driven
     //! by measurements. If we get a gap in measurements for some reason, we want

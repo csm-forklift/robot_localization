@@ -696,6 +696,13 @@ namespace RobotLocalization
     // Determine if we're in 2D mode
     nhLocal_.param("two_d_mode", twoDMode_, false);
 
+    // Scale Process Covariance with speed
+    double scaleProcCov = 0;
+    if (nhLocal_.getParam("scale_process_covariance", scaleProcCov))
+    {
+      filter_.setProcessNoiseCovarianceScaling(true, scaleProcCov);
+    }
+
     // Debugging writes to file
     RF_DEBUG("tf_prefix is " << tfPrefix <<
              "\nmap_frame is " << mapFrameId_ <<
