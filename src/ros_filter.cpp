@@ -1274,6 +1274,7 @@ namespace RobotLocalization
                                                    relative,
                                                    true,
                                                    poseMahalanobisThresh));
+          poseFilPtr->setTolerance(ros::Duration(2.0/frequency_));
           poseFilPtr->registerFailureCallback(boost::bind(&RosFilter<T>::transformPoseFailureCallback,
                                                           this,
                                                           _1,
@@ -1311,6 +1312,7 @@ namespace RobotLocalization
                                         baseLinkFrameId_,
                                         twistUpdateVec,
                                         twistMahalanobisThresh));
+          twistFilPtr->setTolerance(ros::Duration(2.0/frequency_));
           twistFilPtr->registerFailureCallback(boost::bind(&RosFilter<T>::transformTwistFailureCallback,
                                                            this,
                                                            _1,
@@ -1339,6 +1341,7 @@ namespace RobotLocalization
                                                     baseLinkFrameId_,
                                                     accelUpdateVec,
                                                     accelMahalanobisThresh));
+          accelFilPtr->setTolerance(ros::Duration(2.0/frequency_));
           accelFilPtr->registerFailureCallback(boost::bind(&RosFilter<T>::transformImuFailureCallback,
                                                            this,
                                                            _1,
