@@ -706,6 +706,8 @@ namespace RobotLocalization
     if (worldFrameId_ == mapFrameId_)
     {
       size_t tries = 0;
+      const size_t tries_warn  = 10;
+      const size_t tries_error = 20;
       const double timeout = 3.0;
       while (!tfBuffer_.canTransform(baseLinkFrameId_, odomFrameId_, ros::Time(0), ros::Duration(timeout)))
       {
@@ -717,16 +719,17 @@ namespace RobotLocalization
                << timeout * tries << "s)";
 
         const ros::console::levels::Level log_level =
-             tries <  5 ? ros::console::levels::Debug :
-            (tries < 10 ? ros::console::levels::Warn  :
-                          ros::console::levels::Error);
+             tries < tries_warn ? ros::console::levels::Debug :
+                                  ros::console::levels::Warn;
 
         const int diagnostic_status =
-              tries <  5 ? diagnostic_msgs::DiagnosticStatus::OK   :
-             (tries < 10 ? diagnostic_msgs::DiagnosticStatus::WARN :
-                           diagnostic_msgs::DiagnosticStatus::ERROR);
+              tries < tries_warn  ? diagnostic_msgs::DiagnosticStatus::OK   :
+             (tries < tries_error ? diagnostic_msgs::DiagnosticStatus::WARN :
+                                    diagnostic_msgs::DiagnosticStatus::ERROR);
 
         ROS_LOG(log_level, ROSCONSOLE_DEFAULT_NAME, "%s", stream.str().c_str());
+
+        ROS_ERROR_STREAM_COND(tries == tries_error, stream.str());
 
         addDiagnostic(diagnostic_status,
                       baseLinkFrameId_ + "->" + odomFrameId_ + "_transform",
