@@ -42,8 +42,9 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <robot_localization/common_utilities.h>
 
-#define RF_DEBUG(msg) if (filter_.getDebug()) { debugStream_ << msg; }
+#define RF_DEBUG(msg) if (filter_.getDebug()) { RL_DEBUG(msg) }
 
 // Handy methods for debug output
 std::ostream& operator<<(std::ostream& os, const tf2::Vector3 &vec);
@@ -96,6 +97,72 @@ void stateToTF(const Eigen::VectorXd &state, tf2::Transform &stateTF);
 //! @param[out] state - The converted state
 //!
 void TFtoState(const tf2::Transform &stateTF, Eigen::VectorXd &state);
+
+
+//! @brief Class to determine if it is time to publish
+class TimeToPublish
+{
+
+public:
+
+  //! @brief Default constructor
+  TimeToPublish()
+    : period_(0.02)
+    , last_(ros::WallTime::now().toSec())
+    , tolerance_(0.001)
+  {}
+
+  //! @brief Constructor
+  TimeToPublish(const double period, const double last)
+    : period_(period)
+    , last_(last)
+    , tolerance_(0.001)
+  {}
+
+  //! @brief True if it's time to publish
+  bool operator()()
+  {
+    return operator()(ros::WallTime::now().toSec());
+  }
+
+  //! @brief True if it's time to publish at time current
+  bool operator()(const double& current)
+  {
+    // if current < last_ something is wrong, set last_ to current
+    if (current < last_)
+    {
+      last_ = current;
+    }
+    if (current - last_ + tolerance_ > period_)
+    {
+      last_ = current;
+      return true;
+    }
+    return false;
+  }
+
+  //! @brief Seconds left from current to publish time
+  double left(const double& current )
+  {
+    if (current < last_)
+    {
+      last_ = current;
+    }
+    return std::max(0.0, period_ - current + last_);
+  }
+
+  //! @brief Seconds left to publish time
+  double left()
+  {
+    return left(ros::WallTime::now().toSec());
+  }
+
+private:
+  double period_;
+  double last_;
+  double tolerance_;
+
+};
 
 }  // namespace RosFilterUtilities
 }  // namespace RobotLocalization
