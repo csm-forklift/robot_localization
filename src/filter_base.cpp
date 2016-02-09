@@ -49,8 +49,7 @@ namespace RobotLocalization
     covarianceEpsilon_(STATE_SIZE, STATE_SIZE),
     processNoiseCovariance_(STATE_SIZE, STATE_SIZE),
     identity_(STATE_SIZE, STATE_SIZE),
-    debug_(false),
-    debugStream_(NULL)
+    debug_(false)
   {
     initialized_ = false;
 
@@ -227,24 +226,9 @@ namespace RobotLocalization
     FB_DEBUG("------ /FilterBase::processMeasurement (" << measurement.topicName_ << ") ------\n");
   }
 
-  void FilterBase::setDebug(const bool debug, std::ostream *outStream)
+  void FilterBase::setDebug(const bool debug)
   {
-    if (debug)
-    {
-      if (outStream != NULL)
-      {
-        debugStream_ = outStream;
-        debug_ = true;
-      }
-      else
-      {
-        debug_ = false;
-      }
-    }
-    else
-    {
-      debug_ = false;
-    }
+   debug_ = debug;
   }
 
   void FilterBase::setEstimateErrorCovariance(const Eigen::MatrixXd &estimateErrorCovariance)

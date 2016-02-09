@@ -381,71 +381,71 @@ namespace RobotLocalization
              "Integration time is " << std::setprecision(20) << currentTime << "\n"
              << measurementQueue_.size() << " measurements in queue.\n");
 
-    // If we have any measurements in the queue, process them
-    if(measurementsReady_.timed_wait(lock,boost::posix_time::milliseconds(filter_.getSensorTimeout()*1000)))
+    // If we do not have measurements in the queue wait until it is time to publish
+    if(measurementQueue_.empty())
     {
-      if(!measurementQueue_.empty())
+      if(!measurementsReady_.timed_wait(lock, boost::posix_time::milliseconds(1000*(timeToPublish_.left()))))
       {
 
-        double lastMessageTime;
-        while (!measurementQueue_.empty())
+        if (filter_.getInitializedStatus())
         {
-          Measurement measurement = measurementQueue_.top();
-          measurementQueue_.pop();
-          bool queueEmpty = measurementQueue_.empty();
-          double nextMeasurementTime = 0;
-          if(!queueEmpty)
+          // In the event that we don't get any measurements for a long time,
+          // we still need to continue to estimate our state. Therefore, we
+          // should project the state forward here.
+          double lastUpdateDelta = ros::Time::now().toSec() - filter_.getLastUpdateTime();
+
+          // If we get a large delta, then continuously predict until
+          if (lastUpdateDelta >= filter_.getSensorTimeout())
           {
-            nextMeasurementTime = measurementQueue_.top().time_;
+            RF_DEBUG("Sensor timeout! Last update time was " << filter_.getLastUpdateTime() <<
+                     ", current time is " << currentTime <<
+                     ", delta is " << lastUpdateDelta << "\n");
+
+            filter_.validateDelta(lastUpdateDelta);
+            filter_.predict(lastUpdateDelta);
+
+            // Update the last measurement time and last update time
+            filter_.setLastMeasurementTime(filter_.getLastMeasurementTime() + lastUpdateDelta);
+            filter_.setLastUpdateTime(filter_.getLastUpdateTime() + lastUpdateDelta);
           }
-          lock.unlock();
-          // This will call predict and, if necessary, correct
-          filter_.processMeasurement(measurement);
-          lastMessageTime = measurement.time_;
-          // If the next measurement comes from the same message don't publish
-          if (nextMeasurementTime != lastMessageTime)
+          if(timeToPublish_())
           {
-            filter_.setLastUpdateTime(currentTime);
-            publishState(ros::Time(lastMessageTime));
+            publishState();
           }
-          lock.lock();
+        }
+        else
+        {
+          RF_DEBUG("Filter not yet initialized.\n");
         }
       }
     }
-    else if (filter_.getInitializedStatus())
-    {
-      // In the event that we don't get any measurements for a long time,
-      // we still need to continue to estimate our state. Therefore, we
-      // should project the state forward here.
-      double lastUpdateDelta = currentTime - filter_.getLastUpdateTime();
 
-      // If we get a large delta, then continuously predict until
-      if (lastUpdateDelta >= filter_.getSensorTimeout())
+    while (!measurementQueue_.empty())
+    {
+      Measurement measurement = measurementQueue_.top();
+      measurementQueue_.pop();
+      lock.unlock();
+      // This will call predict and, if necessary, correct
+      filter_.processMeasurement(measurement);
+      filter_.setLastUpdateTime(ros::Time::now().toSec());
+      if(timeToPublish_())
       {
-        RF_DEBUG("Sensor timeout! Last update time was " << filter_.getLastUpdateTime() <<
-                 ", current time is " << currentTime <<
-                 ", delta is " << lastUpdateDelta << "\n");
-
-        filter_.validateDelta(lastUpdateDelta);
-        filter_.predict(lastUpdateDelta);
-
-        // Update the last measurement time and last update time
-        filter_.setLastMeasurementTime(filter_.getLastMeasurementTime() + lastUpdateDelta);
-        filter_.setLastUpdateTime(filter_.getLastUpdateTime() + lastUpdateDelta);
-        publishState(ros::Time(currentTime));
+          publishState();
       }
-    }
-    else
-    {
-      RF_DEBUG("Filter not yet initialized.\n");
+      lock.lock();
     }
 
     RF_DEBUG("\n----- /RosFilter::integrateMeasurements ------\n");
   }
 
   template<typename T>
-  void RosFilter<T>::publishState(const ros::Time& stamp)
+  void RosFilter<T>::publishState()
   {
+    // If the odometryPublisher is not valid return
+    if(!odometryPub_)
+    {
+      return;
+    }
       // Get latest state and publish it
       nav_msgs::Odometry filteredPosition;
 
@@ -518,38 +518,31 @@ namespace RobotLocalization
 
         // Fire off the position and the transform
         odometryPub_.publish(filteredPosition);
+
+        if(printDiagnostics_)
+        {
+            freqDiag_->tick();
+        }
+
       }
   }
 
   template<typename T>
   void RosFilter<T>::integrationLoop()
   {
-    // Not quite sure how to set the limits on the frequency in this case
-    // Set up the frequency diagnostic
-    double minFrequency = frequency_ - 50;
-    double maxFrequency = frequency_ + 50;
-    diagnostic_updater::HeaderlessTopicDiagnostic freqDiag("odometry/filtered",
-                                                           diagnosticUpdater_,
-                                                           diagnostic_updater::FrequencyStatusParam(&minFrequency,
-                                                                                                    &maxFrequency,
-                                                                                                    0.1, 10));
-    ros::Time lastDiagTime = ros::Time::now();
+     ros::Time lastDiagTime = ros::Time::now();
 
      while (ros::ok())
      {
-         if(printDiagnostics_)
-         {
-             freqDiag.tick();
-         }
          // Now we'll integrate any measurements we've received
          ros::Time curTime = ros::Time::now();
          integrateMeasurements(curTime.now().toSec());
-
+                 
+         const double diagDuration = (curTime - lastDiagTime).toSec();
          /* Diagnostics can behave strangely when playing back from bag
-        * files and using simulated time, so we have to check for
-        * time suddenly moving backwards as well as the standard
-        * timeout criterion before publishing. */
-         double diagDuration = (curTime - lastDiagTime).toSec();
+          * files and using simulated time, so we have to check for
+          * time suddenly moving backwards as well as the standard
+          * timeout criterion before publishing. */
          if(printDiagnostics_ && (diagDuration >= diagnosticUpdater_.getPeriod() || diagDuration < 0.0))
          {
              diagnosticUpdater_.force_update();
@@ -593,27 +586,9 @@ namespace RobotLocalization
     if (debug)
     {
       std::string debugOutFile;
-
-      try
-      {
-        nhLocal_.param("debug_out_file", debugOutFile, std::string("robot_localization_debug.txt"));
-        debugStream_.open(debugOutFile.c_str());
-
-        // Make sure we succeeded
-        if (debugStream_.is_open())
-        {
-          filter_.setDebug(debug, &debugStream_);
-        }
-        else
-        {
-          ROS_WARN_STREAM("RosFilter::loadParams() - unable to create debug output file " << debugOutFile);
-        }
-      }
-      catch(const std::exception &e)
-      {
-        ROS_WARN_STREAM("RosFilter::loadParams() - unable to create debug output file" << debugOutFile
-                        << ". Error was " << e.what() << "\n");
-      }
+      nhLocal_.param("debug_out_file", debugOutFile, std::string("robot_localization_debug.txt"));
+      CommonUtilities::DebugLogger::getInstance().setDebugFile(debugOutFile);
+      filter_.setDebug(true);
     }
 
     // These params specify the name of the robot's body frame (typically
@@ -683,6 +658,17 @@ namespace RobotLocalization
     nhLocal_.param("sensor_timeout", sensorTimeout, 1.0 / frequency_);
     filter_.setSensorTimeout(sensorTimeout);
 
+    // Set the timeToPublish timer
+    timeToPublish_ = RosFilterUtilities::TimeToPublish(1.0/frequency_, ros::WallTime::now().toSec());
+
+    // Set up the frequency diagnostic
+    minFrequency_ = frequency_ - 5;
+    maxFrequency_ = frequency_ + 5;
+
+    freqDiag_.reset(new diagnostic_updater::HeaderlessTopicDiagnostic("odometry/filtered",
+                                                                        diagnosticUpdater_,
+                                                                        diagnostic_updater::FrequencyStatusParam(&minFrequency_,
+                                                                                                               &maxFrequency_,                                                                                                             0.1, 10)));
     // Determine if we're in 2D mode
     nhLocal_.param("two_d_mode", twoDMode_, false);
 
@@ -1486,8 +1472,8 @@ namespace RobotLocalization
 
     while (ros::ok())
     {
-        //Not sure how to figure out what's the wait duration, currently going with 5ms
-        ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(0.005));
+      // Wait for a callbak
+      ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(0.005));
     }
 
     // Wait for thread to join so we can be sure the thread does not make

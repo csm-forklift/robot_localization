@@ -185,11 +185,9 @@ class FilterBase
     //! The value must be a pointer to a valid ostream object.
     //!
     //! @param[in] debug - Whether or not to place the filter in debug mode
-    //! @param[in] outStream - If debug is true, then this must have a valid pointer.
-    //! If the pointer is invalid, the filter will not enter debug mode. If debug is
-    //! false, outStream is ignored.
+    //! @param[in] debug - If debug is true, the filter will enter in debug mode.
     //!
-    void setDebug(const bool debug, std::ostream *outStream = NULL);
+    void setDebug(const bool debug);
 
     //! @brief Manually sets the filter's estimate error covariance
     //!
@@ -257,10 +255,6 @@ class FilterBase
     //! positive-definite property.
     //!
     Eigen::MatrixXd covarianceEpsilon_;
-
-    //! @brief Used for outputting debug messages
-    //!
-    std::ostream *debugStream_;
 
     //! @brief This matrix stores the total error in our position
     //! estimate (the state_ variable).
