@@ -394,7 +394,7 @@ namespace RobotLocalization
     // If we do not have measurements in the queue wait until it is time to publish
     if(measurementQueue_.empty())
     {
-      if(!measurementsReady_.timed_wait(lock, boost::posix_time::milliseconds(1000*(timeToPublish_.left()))))
+      if(!measurementsReady_.timed_wait(lock, boost::posix_time::milliseconds(1000*filter_.getSensorTimeout())))
       {
 
         if (filter_.getInitializedStatus())
@@ -402,12 +402,13 @@ namespace RobotLocalization
           // In the event that we don't get any measurements for a long time,
           // we still need to continue to estimate our state. Therefore, we
           // should project the state forward here.
-          double lastUpdateDelta = ros::Time::now().toSec() - filter_.getLastUpdateTime();
+          const double lastUpdateTime = filter_.getLastUpdateTime();
+          double lastUpdateDelta = ros::Time::now().toSec() - lastUpdateTime;
 
           // If we get a large delta, then continuously predict until
           if (lastUpdateDelta >= filter_.getSensorTimeout())
           {
-            RF_DEBUG("Sensor timeout! Last update time was " << filter_.getLastUpdateTime() <<
+            RF_DEBUG("Sensor timeout! Last update time was " << lastUpdateTime <<
                      ", current time is " << currentTime <<
                      ", delta is " << lastUpdateDelta << "\n");
 
@@ -416,7 +417,7 @@ namespace RobotLocalization
 
             // Update the last measurement time and last update time
             filter_.setLastMeasurementTime(filter_.getLastMeasurementTime() + lastUpdateDelta);
-            filter_.setLastUpdateTime(filter_.getLastUpdateTime() + lastUpdateDelta);
+            filter_.setLastUpdateTime(lastUpdateTime + lastUpdateDelta);
           }
           if(timeToPublish_())
           {
@@ -443,6 +444,12 @@ namespace RobotLocalization
           publishState();
       }
       lock.lock();
+    }
+
+    // In case the condition variable was awaken by a timeToPublish notification and the queue was empty
+    if(timeToPublish_())
+    {
+      publishState();
     }
 
     RF_DEBUG("\n----- /RosFilter::integrateMeasurements ------\n");
@@ -597,7 +604,7 @@ namespace RobotLocalization
     {
       std::string debugOutFile;
       nhLocal_.param("debug_out_file", debugOutFile, std::string("robot_localization_debug.txt"));
-      CommonUtilities::DebugLogger::getInstance().setDebugFile(debugOutFile);
+      DebugLogger::getInstance().setDebugFile(debugOutFile);
       filter_.setDebug(true);
     }
 
@@ -669,7 +676,8 @@ namespace RobotLocalization
     filter_.setSensorTimeout(sensorTimeout);
 
     // Set the timeToPublish timer
-    timeToPublish_ = RosFilterUtilities::TimeToPublish(1.0/frequency_, ros::WallTime::now().toSec());
+    timeToPublish_.setFrequency(frequency_);
+    timeToPublish_.setConditionVariable(measurementsReady_);
 
     // Set up the frequency diagnostic
     minFrequency_ = frequency_ - 5;
@@ -1686,7 +1694,7 @@ namespace RobotLocalization
 
     while (ros::ok())
     {
-      // Wait for a callbak
+      // Wait for callbak
       ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(0.005));
     }
 

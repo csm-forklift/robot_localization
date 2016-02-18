@@ -39,9 +39,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <robot_localization/common_utilities.h>
+#include <robot_localization/debug_logger.h>
 
-#define FB_DEBUG(msg) if (getDebug()) {RL_DEBUG(msg) }
+#define FB_DEBUG(msg) if (getDebug()) { RL_DEBUG(msg) }
 
 // Handy methods for debug output
 std::ostream& operator<<(std::ostream& os, const Eigen::MatrixXd &mat);
