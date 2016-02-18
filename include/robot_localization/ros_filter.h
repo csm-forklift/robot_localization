@@ -37,6 +37,7 @@
 #include "robot_localization/filter_common.h"
 #include "robot_localization/filter_base.h"
 #include "robot_localization/SetPose.h"
+#include <robot_localization/time_to_publish.h>
 
 #include <ros/ros.h>
 #include <std_msgs/String.h>
@@ -593,7 +594,7 @@ template<class T> class RosFilter
 
     //! @brief TimeToPublish object that determines the publishing time to maintain a constant rate
     //!
-    RosFilterUtilities::TimeToPublish timeToPublish_;
+    TimeToPublish timeToPublish_;
 
     //! @brief Frequency diagnostics updater
     //!
@@ -604,6 +605,7 @@ template<class T> class RosFilter
     double minFrequency_;
 
     //! Maximum desired frequency
+    //!
     double maxFrequency_;
 
   };
