@@ -123,7 +123,7 @@ TEST(FilterBaseTest, DerivedFilterGetSet)
 
     FilterDerived derived;
 
-    // the bebug flag should be false by default
+    // the debug flag should be false by default
     EXPECT_FALSE(derived.getDebug());
 
     // the debug flag should become true.
