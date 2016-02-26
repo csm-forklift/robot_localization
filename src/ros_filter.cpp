@@ -1695,7 +1695,7 @@ namespace RobotLocalization
     while (ros::ok())
     {
       // Wait for callbak
-      ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(0.005));
+      ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(filter_.getSensorTimeout()));
     }
 
     // Wait for thread to join so we can be sure the thread does not make
