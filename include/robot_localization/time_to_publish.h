@@ -76,7 +76,7 @@ namespace RobotLocalization
 
     //! @brief Mutex to protect access to isTime_
     //!
-    boost::mutex Mutex_;
+    boost::mutex mutex_;
 
     //! @brief Thread that runs the timing loop
     //!
@@ -109,13 +109,13 @@ namespace RobotLocalization
 
   void TimeToPublish::setConditionVariable(boost::condition_variable& condition)
   {
-    boost::mutex::scoped_lock lock(Mutex_);
+    boost::mutex::scoped_lock lock(mutex_);
     condition_.reset(&condition);
   }
 
   bool TimeToPublish::operator()()
   {
-    boost::mutex::scoped_lock lock(Mutex_);
+    boost::mutex::scoped_lock lock(mutex_);
 
     if (isTime_)
     {
@@ -135,11 +135,11 @@ namespace RobotLocalization
       while (ros::ok())
       {
         {
-          boost::mutex::scoped_lock lock(Mutex_);
+          boost::mutex::scoped_lock lock(mutex_);
 
           isTime_ = true;
 
-          if(condition_)
+          if (condition_)
           {
             condition_->notify_one();
           }
@@ -150,7 +150,7 @@ namespace RobotLocalization
     }
     catch (boost::thread_interrupted&)
     {
-      ROS_INFO("TimeToPublish: Timing thread interrupted");
+      ROS_DEBUG("TimeToPublish: Timing thread interrupted");
     }
   }
 
