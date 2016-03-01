@@ -123,15 +123,11 @@ TEST(FilterBaseTest, DerivedFilterGetSet)
 
     FilterDerived derived;
 
-    // With the ostream argument as NULL,
-    // the debug flag will remain false.
-    derived.setDebug(true);
-
+    // the debug flag should be false by default
     EXPECT_FALSE(derived.getDebug());
 
-    // Now set the stream and do it again
-    std::stringstream os;
-    derived.setDebug(true, &os);
+    // the debug flag should become true.
+    derived.setDebug(true);
 
     EXPECT_TRUE(derived.getDebug());
 

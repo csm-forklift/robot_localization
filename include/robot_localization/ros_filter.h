@@ -37,6 +37,7 @@
 #include "robot_localization/filter_common.h"
 #include "robot_localization/filter_base.h"
 #include "robot_localization/SetPose.h"
+#include <robot_localization/time_to_publish.h>
 
 #include <ros/ros.h>
 #include <std_msgs/String.h>
@@ -358,9 +359,8 @@ template<class T> class RosFilter
                       Eigen::MatrixXd &measurementCovariance);
 
      //! @brief Publishes the current state vector
-     //! @param[in] stamp - The time stamp to use for the published msg header
      //!
-     void publishState(const ros::Time& stamp);
+     void publishState();
 
      //! @brief integrates the measurements in the queue and publishes the result
      //!
@@ -387,10 +387,6 @@ template<class T> class RosFilter
     //! The values are considered transient and are cleared at every iteration.
     //!
     std::map<std::string, std::string> dynamicDiagnostics_;
-
-    //! @brief Used for outputting debug messages
-    //!
-    std::ofstream debugStream_;
 
     //! @brief The max (worst) dynamic diagnostic level.
     //!
@@ -595,6 +591,22 @@ template<class T> class RosFilter
     //! simultaneous updates in addDiagnostic and aggregateDiagnostics.
     //!
     boost::mutex diagnosticMapsMutex_;
+
+    //! @brief TimeToPublish object that determines the publishing time to maintain a constant rate
+    //!
+    TimeToPublish timeToPublish_;
+
+    //! @brief Frequency diagnostics updater
+    //!
+    boost::shared_ptr<diagnostic_updater::HeaderlessTopicDiagnostic> freqDiag_;
+
+    //! Minimum desired frequency
+    //!
+    double minFrequency_;
+
+    //! Maximum desired frequency
+    //!
+    double maxFrequency_;
 
   };
 }  // namespace RobotLocalization

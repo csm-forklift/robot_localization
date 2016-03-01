@@ -42,8 +42,9 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <robot_localization/debug_logger.h>
 
-#define RF_DEBUG(msg) if (filter_.getDebug()) { debugStream_ << msg; }
+#define RF_DEBUG(msg) if (filter_.getDebug()) { RL_DEBUG(msg) }
 
 // Handy methods for debug output
 std::ostream& operator<<(std::ostream& os, const tf2::Vector3 &vec);
@@ -96,7 +97,6 @@ void stateToTF(const Eigen::VectorXd &state, tf2::Transform &stateTF);
 //! @param[out] state - The converted state
 //!
 void TFtoState(const tf2::Transform &stateTF, Eigen::VectorXd &state);
-
 }  // namespace RosFilterUtilities
 }  // namespace RobotLocalization
 
