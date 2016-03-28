@@ -49,6 +49,10 @@ namespace RobotLocalization
     //!
     TimeToPublish(const double frequency_ = 50.0);
 
+    //! @brief Destructor
+    //!
+    ~TimeToPublish();
+
     //! @brief Set the publishing period
     //!
     void setFrequency(const double frequency_);
@@ -72,7 +76,7 @@ namespace RobotLocalization
 
     //! @brief Condition variable to be notified on time to publish
     //!
-    boost::shared_ptr<boost::condition_variable> condition_;
+    boost::condition_variable* condition_;
 
     //! @brief Mutex to protect access to isTime_
     //!
@@ -93,6 +97,16 @@ namespace RobotLocalization
   {
   }
 
+  TimeToPublish::~TimeToPublish()
+  {
+    // Stop timing thread if running
+    if (thread_)
+    {
+      thread_->interrupt();
+      thread_->join();
+    }
+  }
+
   void TimeToPublish::setFrequency(const double frequency)
   {
     frequency_ = frequency;
@@ -110,7 +124,7 @@ namespace RobotLocalization
   void TimeToPublish::setConditionVariable(boost::condition_variable& condition)
   {
     boost::mutex::scoped_lock lock(mutex_);
-    condition_.reset(&condition);
+    condition_ = &condition;
   }
 
   bool TimeToPublish::operator()()
