@@ -1174,7 +1174,7 @@ namespace RobotLocalization
     *    1. Multiple non-differential input sources
     *    2. No absolute *or* velocity measurements for pose variables
     */
-    if (printDiagnostics_)
+    if (printDiagnostics_ && debug) // Only output if in debug mode
     {
       for (int stateVar = StateMemberX; stateVar <= StateMemberYaw; ++stateVar)
       {
