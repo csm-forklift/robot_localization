@@ -394,40 +394,51 @@ namespace RobotLocalization
     // If we do not have measurements in the queue wait until it is time to publish
     if(measurementQueue_.empty())
     {
-      if(!measurementsReady_.timed_wait(lock, boost::posix_time::milliseconds(1000*filter_.getSensorTimeout())))
+      try
       {
-
-        if (filter_.getInitializedStatus())
+        if(!measurementsReady_.timed_wait(lock, boost::posix_time::milliseconds(1000*filter_.getSensorTimeout())))
         {
-          // In the event that we don't get any measurements for a long time,
-          // we still need to continue to estimate our state. Therefore, we
-          // should project the state forward here.
-          const double lastUpdateTime = filter_.getLastUpdateTime();
-          double lastUpdateDelta = ros::Time::now().toSec() - lastUpdateTime;
 
-          // If we get a large delta, then continuously predict until
-          if (lastUpdateDelta >= filter_.getSensorTimeout())
+          if (filter_.getInitializedStatus())
           {
-            RF_DEBUG("Sensor timeout! Last update time was " << lastUpdateTime <<
-                     ", current time is " << currentTime <<
-                     ", delta is " << lastUpdateDelta << "\n");
+            // In the event that we don't get any measurements for a long time,
+            // we still need to continue to estimate our state. Therefore, we
+            // should project the state forward here.
+            const double lastUpdateTime = filter_.getLastUpdateTime();
+            double lastUpdateDelta = ros::Time::now().toSec() - lastUpdateTime;
 
-            filter_.validateDelta(lastUpdateDelta);
-            filter_.predict(lastUpdateDelta);
+            // If we get a large delta, then continuously predict until
+            if (lastUpdateDelta >= filter_.getSensorTimeout())
+            {
+              RF_DEBUG("Sensor timeout! Last update time was " << lastUpdateTime <<
+                       ", current time is " << currentTime <<
+                       ", delta is " << lastUpdateDelta << "\n");
 
-            // Update the last measurement time and last update time
-            filter_.setLastMeasurementTime(filter_.getLastMeasurementTime() + lastUpdateDelta);
-            filter_.setLastUpdateTime(lastUpdateTime + lastUpdateDelta);
+              filter_.validateDelta(lastUpdateDelta);
+              filter_.predict(lastUpdateDelta);
+
+              // Update the last measurement time and last update time
+              filter_.setLastMeasurementTime(filter_.getLastMeasurementTime() + lastUpdateDelta);
+              filter_.setLastUpdateTime(lastUpdateTime + lastUpdateDelta);
+            }
+            if(timeToPublish_())
+            {
+              publishState();
+            }
           }
-          if(timeToPublish_())
+          else
           {
-            publishState();
+            RF_DEBUG("Filter not yet initialized.\n");
           }
         }
-        else
-        {
-          RF_DEBUG("Filter not yet initialized.\n");
-        }
+      }
+      catch(const boost::thread_interrupted&)
+      {
+        RF_DEBUG("Filter interrupted.\n");
+      }
+      catch(const boost::thread_resource_error& e)
+      {
+        RF_DEBUG("Filter interrupted.\n");
       }
     }
 
