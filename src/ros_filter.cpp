@@ -564,8 +564,8 @@ namespace RobotLocalization
      {
          // Now we'll integrate any measurements we've received
          ros::Time curTime = ros::Time::now();
-         integrateMeasurements(curTime.now().toSec());
-                 
+         integrateMeasurements(curTime.toSec());
+
          const double diagDuration = (curTime - lastDiagTime).toSec();
          /* Diagnostics can behave strangely when playing back from bag
           * files and using simulated time, so we have to check for
