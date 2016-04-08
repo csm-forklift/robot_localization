@@ -687,8 +687,8 @@ namespace RobotLocalization
     filter_.setSensorTimeout(sensorTimeout);
 
     // Set the timeToPublish timer
-    timeToPublish_.setFrequency(frequency_);
     timeToPublish_.setConditionVariable(measurementsReady_);
+    timeToPublish_.setFrequency(frequency_);
 
     // Set up the frequency diagnostic
     minFrequency_ = frequency_ - 5;
