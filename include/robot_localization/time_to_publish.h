@@ -94,6 +94,7 @@ namespace RobotLocalization
   TimeToPublish::TimeToPublish(const double frequency)
     : frequency_(frequency)
     , isTime_(false)
+    , condition_(NULL)
   {
   }
 
