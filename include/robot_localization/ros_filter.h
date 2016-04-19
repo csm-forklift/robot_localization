@@ -345,10 +345,6 @@ template<class T> class RosFilter
      //!
      void integrationLoop();
 
-    //! @brief Vector to hold our acceleration (represented as IMU) message filters so they don't go out of scope.
-    //!
-    std::map<std::string, imuMFPtr> accelerationMessageFilters_;
-
     //! @brief tf frame name for the robot's body frame
     //!
     std::string baseLinkFrameId_;
