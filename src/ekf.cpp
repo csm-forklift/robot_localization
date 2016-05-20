@@ -362,7 +362,17 @@ namespace RobotLocalization
     estimateErrorCovariance_ = (transferFunctionJacobian_ *
                                 estimateErrorCovariance_ *
                                 transferFunctionJacobian_.transpose());
-    estimateErrorCovariance_.noalias() += (processNoiseCovariance_ * delta);
+
+    Eigen::MatrixXd processNoise = processNoiseCovariance_;
+    // If the velocity is zero set the position process noise to zero
+    // This make it so that the covariance will not grow if the robot is not moving
+    if (xVel*xVel + yVel*yVel + zVel*zVel < zeroVelocityThreshold_
+        && pitchVel*pitchVel + rollVel*rollVel + yawVel*yawVel < zeroVelocityThreshold_)
+    {
+      processNoise.block<6,6>(0,0) = Eigen::MatrixXd::Zero(6,6);
+    }
+
+    estimateErrorCovariance_.noalias() += (processNoise * delta);
 
     FB_DEBUG("Predicted estimate error covariance is:\n" << estimateErrorCovariance_ <<
              "\n\n--------------------- /Ekf::predict ----------------------\n");
