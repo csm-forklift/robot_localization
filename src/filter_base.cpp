@@ -59,7 +59,8 @@ namespace RobotLocalization
     identity_(STATE_SIZE, STATE_SIZE),
     debug_(false),
     debugStream_(NULL),
-    useControl_(false)
+    useControl_(false),
+    zeroVelocityThreshold_(-1.0)
   {
     initialized_ = false;
 
@@ -308,6 +309,11 @@ namespace RobotLocalization
   void FilterBase::setSensorTimeout(const double sensorTimeout)
   {
     sensorTimeout_ = sensorTimeout;
+  }
+
+  void FilterBase::setZeroVelocityThreshold(const double zeroVelocityThreshold)
+  {
+    zeroVelocityThreshold_ = zeroVelocityThreshold;
   }
 
   void FilterBase::setState(const Eigen::VectorXd &state)

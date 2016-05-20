@@ -660,6 +660,11 @@ namespace RobotLocalization
     nhLocal_.param("sensor_timeout", sensorTimeout, 1.0 / frequency_);
     filter_.setSensorTimeout(sensorTimeout);
 
+    // Get Zero velocity threshold
+    double zeroVelocityThreshold;
+    nhLocal_.param("zero_velocity_threshold", zeroVelocityThreshold, -1.0);
+    filter_.setZeroVelocityThreshold(zeroVelocityThreshold);
+
     // Determine if we're in 2D mode
     nhLocal_.param("two_d_mode", twoDMode_, false);
 

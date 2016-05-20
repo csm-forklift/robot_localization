@@ -318,6 +318,13 @@ class FilterBase
     //!
     void setSensorTimeout(const double sensorTimeout);
 
+    //! @brief Sets the zero velocity threshold
+    //!
+    //! @param[in] zervoVelocityThreshold - The velocity below which we set process noise to zero
+    //! Note a negative value will disable this feature.
+    //!
+    void setZeroVelocityThreshold(const double zeroVelocityThreshold);
+
     //! @brief Manually sets the filter's state
     //!
     //! @param[in] state - The state to set as the filter's current state
@@ -491,6 +498,10 @@ class FilterBase
     //! this timeout, we will continue to call predict() at the filter's frequency.
     //!
     double sensorTimeout_;
+
+    ///! @brief The threshold on considering a state zero velocity
+    ///!
+    double zeroVelocityThreshold_;
 
     //! @brief This is the robot's state vector, which is what we are trying to
     //! filter. The values in this vector are what get reported by the node.
