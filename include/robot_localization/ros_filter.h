@@ -49,9 +49,7 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
-#include <tf2_ros/message_filter.h>
 #include <tf2/LinearMath/Transform.h>
-#include <message_filters/subscriber.h>
 #include <diagnostic_updater/diagnostic_updater.h>
 #include <diagnostic_updater/publisher.h>
 #include <diagnostic_msgs/DiagnosticStatus.h>
@@ -232,11 +230,6 @@ template<class T> class RosFilter
     //! @return boolean true if successful, false if not
     bool setPoseSrvCallback(robot_localization::SetPose::Request& request,
                             robot_localization::SetPose::Response&);
-
-    //! @brief Converts tf message filter failures to strings
-    //! @param[in] reason - The failure reason object
-    //! @return a string explanation of the failure
-    std::string tfFailureReasonString(const tf2_ros::FilterFailureReason reason);
 
     //! @brief Callback method for receiving all twist messages
     //! @param[in] msg - The ROS stamped twist with covariance message to take in.

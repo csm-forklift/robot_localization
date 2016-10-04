@@ -6,7 +6,6 @@ find_package(catkin REQUIRED COMPONENTS
   diagnostic_updater
   geographic_msgs
   geometry_msgs
-  message_filters
   message_generation
   nav_msgs
   roscpp
@@ -64,7 +63,6 @@ catkin_package(
     diagnostic_updater
     geographic_msgs
     geometry_msgs
-    message_filters
     message_runtime
     nav_msgs
     roscpp
