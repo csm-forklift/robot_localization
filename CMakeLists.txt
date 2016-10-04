@@ -100,6 +100,19 @@ add_executable(ekf_localization_node src/ekf_localization_node.cpp)
 add_executable(ukf_localization_node src/ukf_localization_node.cpp)
 add_executable(navsat_transform_node src/navsat_transform_node.cpp)
 
+# Set Target Properties
+set_target_properties(filter_utilities PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(filter_base PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(ekf PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(ukf PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(ros_filter_utilities PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(ros_filter PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(navsat_transform PROPERTIES COMPILE_OPTIONS "-std=c++11")
+
+set_target_properties(ekf_localization_node PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(ukf_localization_node PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(navsat_transform_node PROPERTIES COMPILE_OPTIONS "-std=c++11")
+
 # Linking
 target_link_libraries(ros_filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
 target_link_libraries(filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
