@@ -30,21 +30,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROBOT_LOCALIZATION_ROS_FILTER_TYPES_H
-#define ROBOT_LOCALIZATION_ROS_FILTER_TYPES_H
-
-#include "robot_localization/ros_filter.h"
-#include "robot_localization/ekf.h"
-#include "robot_localization/ukf.h"
+#include "robot_localization/ros_filter_types.h"
 #include "robot_localization/mh_ekf.h"
 
-namespace RobotLocalization
+#include <ros/ros.h>
+
+int main(int argc, char **argv)
 {
+  ros::init(argc, argv, "mh_ekf_navigation_node");
 
-typedef RosFilter<Ekf> RosEkf;
-typedef RosFilter<Ukf> RosUkf;
-typedef RosFilter<MhEkf> RosMhEkf;
+  RobotLocalization::RosMhEkf mh_ekf;
 
+  mh_ekf.run();
+
+  return 0;
 }
-
-#endif  // ROBOT_LOCALIZATION_ROS_FILTER_TYPES_H

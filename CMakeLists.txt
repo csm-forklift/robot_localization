@@ -84,6 +84,7 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS})
 add_library(filter_utilities src/filter_utilities.cpp)
 add_library(filter_base src/filter_base.cpp)
 add_library(ekf src/ekf.cpp)
+add_library(mh_ekf src/mh_ekf.cpp)
 add_library(ukf src/ukf.cpp)
 add_library(ros_filter_utilities src/ros_filter_utilities.cpp)
 add_library(ros_filter src/ros_filter.cpp)
@@ -95,6 +96,7 @@ add_dependencies(navsat_transform robot_localization_gencpp)
 
 # Executables
 add_executable(ekf_localization_node src/ekf_localization_node.cpp)
+add_executable(mh_ekf_localization_node src/mh_ekf_localization_node.cpp)
 add_executable(ukf_localization_node src/ukf_localization_node.cpp)
 add_executable(navsat_transform_node src/navsat_transform_node.cpp)
 
@@ -103,11 +105,13 @@ set_target_properties(filter_utilities PROPERTIES COMPILE_OPTIONS "-std=c++11")
 set_target_properties(filter_base PROPERTIES COMPILE_OPTIONS "-std=c++11")
 set_target_properties(ekf PROPERTIES COMPILE_OPTIONS "-std=c++11")
 set_target_properties(ukf PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(mh_ekf PROPERTIES COMPILE_OPTIONS "-std=c++11")
 set_target_properties(ros_filter_utilities PROPERTIES COMPILE_OPTIONS "-std=c++11")
 set_target_properties(ros_filter PROPERTIES COMPILE_OPTIONS "-std=c++11")
 set_target_properties(navsat_transform PROPERTIES COMPILE_OPTIONS "-std=c++11")
 
 set_target_properties(ekf_localization_node PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_target_properties(mh_ekf_localization_node PROPERTIES COMPILE_OPTIONS "-std=c++11")
 set_target_properties(ukf_localization_node PROPERTIES COMPILE_OPTIONS "-std=c++11")
 set_target_properties(navsat_transform_node PROPERTIES COMPILE_OPTIONS "-std=c++11")
 
@@ -116,9 +120,11 @@ target_link_libraries(ros_filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIE
 target_link_libraries(filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
 target_link_libraries(filter_base filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
 target_link_libraries(ekf filter_base ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
+target_link_libraries(mh_ekf filter_base ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
 target_link_libraries(ukf filter_base ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
-target_link_libraries(ros_filter ekf ukf ros_filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
+target_link_libraries(ros_filter ekf mh_ekf ukf ros_filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
 target_link_libraries(ekf_localization_node ros_filter ${catkin_LIBRARIES})
+target_link_libraries(mh_ekf_localization_node ros_filter ${catkin_LIBRARIES})
 target_link_libraries(ukf_localization_node ros_filter ${catkin_LIBRARIES})
 target_link_libraries(navsat_transform filter_utilities ros_filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
 target_link_libraries(navsat_transform_node navsat_transform ${catkin_LIBRARIES})
@@ -130,6 +136,7 @@ target_link_libraries(navsat_transform_node navsat_transform ${catkin_LIBRARIES}
 ## Mark executables and/or libraries for installation
 install(TARGETS
   ekf
+  mh_ekf
   filter_base
   filter_utilities
   navsat_transform
@@ -137,6 +144,7 @@ install(TARGETS
   ros_filter_utilities
   ukf
   ekf_localization_node
+  mh_ekf_localization_node
   navsat_transform_node
   ukf_localization_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -187,11 +195,20 @@ if (CATKIN_ENABLE_TESTING)
                     test/test_ekf.cpp)
   target_link_libraries(test_ekf ros_filter ekf ${catkin_LIBRARIES} ${rostest_LIBRARIES})
 
+  add_rostest_gtest(test_mh_ekf
+                    test/test_mh_ekf.test
+                    test/test_mh_ekf.cpp)
+  target_link_libraries(test_mh_ekf ros_filter mh_ekf ${catkin_LIBRARIES} ${rostest_LIBRARIES})
 
   add_rostest_gtest(test_ekf_localization_node_interfaces
                     test/test_ekf_localization_node_interfaces.test
                     test/test_ekf_localization_node_interfaces.cpp)
   target_link_libraries(test_ekf_localization_node_interfaces ${catkin_LIBRARIES} ${rostest_LIBRARIES})
+
+  add_rostest_gtest(test_mh_ekf_localization_node_interfaces
+                    test/test_mh_ekf_localization_node_interfaces.test
+                    test/test_mh_ekf_localization_node_interfaces.cpp)
+  target_link_libraries(test_mh_ekf_localization_node_interfaces ${catkin_LIBRARIES} ${rostest_LIBRARIES})
 
   add_rostest_gtest(test_ekf_localization_node_bag1
                     test/test_ekf_localization_node_bag1.test
@@ -207,6 +224,21 @@ if (CATKIN_ENABLE_TESTING)
                     test/test_ekf_localization_node_bag3.test
                     test/test_localization_node_bag_pose_tester.cpp)
   target_link_libraries(test_ekf_localization_node_bag3 ${catkin_LIBRARIES} ${rostest_LIBRARIES})
+
+  add_rostest_gtest(test_mh_ekf_localization_node_bag1
+                    test/test_mh_ekf_localization_node_bag1.test
+                    test/test_localization_node_bag_pose_tester.cpp)
+  target_link_libraries(test_mh_ekf_localization_node_bag1 ${catkin_LIBRARIES} ${rostest_LIBRARIES})
+
+  add_rostest_gtest(test_mh_ekf_localization_node_bag2
+                    test/test_mh_ekf_localization_node_bag2.test
+                    test/test_localization_node_bag_pose_tester.cpp)
+  target_link_libraries(test_mh_ekf_localization_node_bag2 ${catkin_LIBRARIES} ${rostest_LIBRARIES})
+
+  add_rostest_gtest(test_mh_ekf_localization_node_bag3
+                    test/test_mh_ekf_localization_node_bag3.test
+                    test/test_localization_node_bag_pose_tester.cpp)
+  target_link_libraries(test_mh_ekf_localization_node_bag3 ${catkin_LIBRARIES} ${rostest_LIBRARIES})
 
   #### UKF TESTS #####
   add_rostest_gtest(test_ukf

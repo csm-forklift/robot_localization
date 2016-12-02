@@ -30,7 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "robot_localization/ekf.h"
+#include "robot_localization/mh_ekf.h"
 #include "robot_localization/filter_common.h"
 #include <ros/ros.h>
 
@@ -40,19 +40,30 @@
 #include <limits>
 #include <sstream>
 #include <vector>
+#include <boost/foreach.hpp>
 
 namespace RobotLocalization
 {
-  Ekf::Ekf(std::vector<double>) :
-    FilterBase()  // Must initialize filter base!
+  /**
+   * @brief Compute (2*pi)^K
+   */
+  constexpr double two_pi_n()
+  {
+    return std::pow(2 * std::atan2(0, -1), STATE_SIZE);
+  }
+
+
+  Hypothesis::Hypothesis(std::vector<double>) :
+    FilterBase(),  // Must initialize filter base!
+    weight_(1.0)
   {
   }
 
-  Ekf::~Ekf()
+  Hypothesis::~Hypothesis()
   {
   }
 
-  void Ekf::correct(const Measurement &measurement)
+  void Hypothesis::correct(const Measurement &measurement)
   {
     FB_DEBUG("---------------------- Ekf::correct ----------------------\n" <<
              "State is:\n" << state_ << "\n"
@@ -158,7 +169,8 @@ namespace RobotLocalization
 
     // (1) Compute the Kalman gain: K = (PH') / (HPH' + R)
     Eigen::MatrixXd pht = estimateErrorCovariance_ * stateToMeasurementSubset.transpose();
-    Eigen::MatrixXd hphrInv  = (stateToMeasurementSubset * pht + measurementCovarianceSubset).inverse();
+    Eigen::MatrixXd hphr = (stateToMeasurementSubset * pht + measurementCovarianceSubset);
+    Eigen::MatrixXd hphrInv  = hphr.inverse();
     kalmanGainSubset.noalias() = pht * hphrInv;
 
     innovationSubset = (measurementSubset - stateSubset);
@@ -181,7 +193,7 @@ namespace RobotLocalization
         }
       }
     }
-    
+
     // (2) Check Mahalanobis distance between mapped measurement and state.
     if (checkMahalanobisThreshold(innovationSubset, hphrInv, measurement.mahalanobisThresh_))
     {
@@ -210,9 +222,14 @@ namespace RobotLocalization
     {
       ROS_ERROR_STREAM(" Measurement "<<measurement.topicName_<<" rejected because of covariance check");
     }
+
+     auto weight = std::exp(-0.5 * innovationSubset.dot(hphrInv * innovationSubset));
+     weight /= std::sqrt(two_pi_n() * hphr.determinant());
+     ROS_ERROR_STREAM(" Weight "<<weight);
+     weight_ *= weight;
   }
 
-  void Ekf::predict(const double referenceTime, const double delta)
+  void Hypothesis::predict(const double referenceTime, const double delta)
   {
     FB_DEBUG("---------------------- Ekf::predict ----------------------\n" <<
              "delta is " << delta << "\n" <<
@@ -401,6 +418,204 @@ namespace RobotLocalization
 
     FB_DEBUG("Predicted estimate error covariance is:\n" << estimateErrorCovariance_ <<
              "\n\n--------------------- /Ekf::predict ----------------------\n");
+  }
+
+
+
+  MhEkf::MhEkf(std::vector<double>) :
+    FilterBase()  // Must initialize filter base!
+  {
+    active_ = boost::make_shared<Hypothesis>();
+    hypotheses_.push_back(active_);
+  }
+
+  MhEkf::~MhEkf()
+  {
+  }
+
+  void MhEkf::updateHypotheses()
+  {
+    const auto sum = std::accumulate(hypotheses_.begin(), hypotheses_.end(), 0.0, [](double v, const Hypothesis::Ptr& h)
+      {
+        return v + h->getWeight();
+      });
+
+    for (auto& hypothesis : hypotheses_)
+    {
+      hypothesis->getWeight() /= sum;
+    }
+
+    active_ = *(std::min_element(hypotheses_.begin(), hypotheses_.end(), Hypothesis::PtrComp()));
+  }
+
+  /**
+   * The code below mostly delegates to the active_ Hypothesis or to all
+   * the hypotheses
+   */
+
+  void MhEkf::correct(const Measurement &measurement)
+  {
+    std::runtime_error("This function should not be called on the Multi-Hypotheis Filter");
+  }
+
+  const Eigen::VectorXd& MhEkf::getControl()
+  {
+    return active_->getControl();
+  }
+
+  double MhEkf::getControlTime()
+  {
+    return active_->getControlTime();
+  }
+
+  bool MhEkf::getDebug()
+  {
+    return active_->getDebug();
+  }
+
+  const Eigen::MatrixXd& MhEkf::getEstimateErrorCovariance()
+  {
+    return active_->getEstimateErrorCovariance();
+  }
+
+  bool MhEkf::getInitializedStatus()
+  {
+    return active_->getInitializedStatus();
+  }
+
+  double MhEkf::getLastMeasurementTime()
+  {
+    return active_->getLastMeasurementTime();
+  }
+
+  double MhEkf::getLastUpdateTime()
+  {
+    return active_->getLastUpdateTime();
+  }
+
+  const Eigen::VectorXd& MhEkf::getPredictedState()
+  {
+    return active_->getPredictedState();
+  }
+
+  const Eigen::MatrixXd& MhEkf::getProcessNoiseCovariance()
+  {
+    return active_->getProcessNoiseCovariance();
+  }
+
+  double MhEkf::getSensorTimeout()
+  {
+    return active_->getSensorTimeout();
+  }
+
+  const Eigen::VectorXd& MhEkf::getState()
+  {
+    return active_->getState();
+  }
+
+  void MhEkf::predict(const double referenceTime, const double delta)
+  {
+    std::runtime_error("This function should not be called on the Multi-Hypotheis Filter");
+  }
+
+  void MhEkf::processMeasurement(const Measurement &measurement)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->processMeasurement(measurement);
+    }
+    updateHypotheses();
+  }
+
+  void MhEkf::setControl(const Eigen::VectorXd &control, const double controlTime)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setControl(control, controlTime);
+    }
+  }
+
+  void MhEkf::setControlParams(const std::vector<int> &updateVector, const double controlTimeout,
+    const std::vector<double> &accelerationLimits, const std::vector<double> &accelerationGains,
+    const std::vector<double> &decelerationLimits, const std::vector<double> &decelerationGains)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setControlParams(updateVector, controlTimeout,accelerationLimits, accelerationGains,
+                                   decelerationLimits, decelerationGains);
+    }
+  }
+
+  void MhEkf::setDebug(const bool debug, std::ostream *outStream)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setDebug(debug, outStream);
+    }
+  }
+
+  void MhEkf::setEstimateErrorCovariance(const Eigen::MatrixXd &estimateErrorCovariance)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setEstimateErrorCovariance(estimateErrorCovariance);
+    }
+  }
+
+  void MhEkf::setLastMeasurementTime(const double lastMeasurementTime)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setLastMeasurementTime(lastMeasurementTime);
+    }
+  }
+
+  void MhEkf::setLastUpdateTime(const double lastUpdateTime)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setLastUpdateTime(lastUpdateTime);
+    }
+  }
+
+  void MhEkf::setProcessNoiseCovariance(const Eigen::MatrixXd &processNoiseCovariance)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setProcessNoiseCovariance(processNoiseCovariance);
+    }
+  }
+
+  void MhEkf::setSensorTimeout(const double sensorTimeout)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setSensorTimeout(sensorTimeout);
+    }
+  }
+
+  void MhEkf::setZeroVelocityThreshold(const double zeroVelocityThreshold)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setZeroVelocityThreshold(zeroVelocityThreshold);
+    }
+  }
+
+  void MhEkf::setState(const Eigen::VectorXd &state)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->setState(state);
+    }
+  }
+
+  void MhEkf::validateDelta(double &delta)
+  {
+    for (const auto& hypothesis : hypotheses_)
+    {
+      hypothesis->validateDelta(delta);
+    }
   }
 
 }  // namespace RobotLocalization
