@@ -423,7 +423,8 @@ namespace RobotLocalization
 
 
   MhEkf::MhEkf(std::vector<double>) :
-    FilterBase()  // Must initialize filter base!
+    FilterBase(),  // Must initialize filter base!
+    max_hypotheses_(4)
   {
     active_ = boost::make_shared<Hypothesis>();
     hypotheses_.push_back(active_);

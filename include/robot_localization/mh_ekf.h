@@ -318,7 +318,7 @@ class MhEkf: public FilterBase
 private:
     Hypothesis::Ptr active_;
     std::vector<Hypothesis::Ptr> hypotheses_;
-    size_t max_hyptheses_;
+    size_t max_hypotheses_;
 };
 
 }  // namespace RobotLocalization
