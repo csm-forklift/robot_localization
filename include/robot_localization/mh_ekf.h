@@ -61,10 +61,36 @@ namespace RobotLocalization
       typedef boost::shared_ptr<Hypothesis> Ptr;
       struct PtrComp
       {
+        enum Criteria
+        {
+          ByWeight,
+          ByUpdateScore
+        };
+
+        PtrComp(const Criteria& criteria)
+        {
+          if (criteria == ByWeight)
+          {
+            comp = [] (const Ptr& lhs, const Ptr& rhs)
+            {
+              return lhs->getWeight() < rhs->getWeight();
+            };
+          }
+          else  // criteria == ByUpdateScore
+          {
+            comp = [] (const Ptr& lhs, const Ptr& rhs)
+            {
+              return lhs->updateScore() < rhs->updateScore();
+            };
+          }
+        }
+
         bool operator() (const Ptr& lhs, const Ptr& rhs)
         {
-          return lhs->getWeight() < rhs->getWeight();
+          comp(lhs, rhs);
         }
+
+        std::function<void(const Ptr& lhs, const Ptr& rhs)> comp;
       };
 
       //! @brief Constructor for the Ekf class
@@ -105,8 +131,39 @@ namespace RobotLocalization
         return weight_;
       }
 
+      size_t failedUpdatesCount() const
+      {
+        return failed_update_count_;
+      }
+
+      double updateScore() const
+      {
+        return update_score_;
+      }
+
+      void applyUpdate();
+
+      friend bool operator <(const Hypothesis& lhs, const Hypothesis& rhs)
+      {
+        return lhs.update_score_ < rhs.update_score_;
+      }
+
     private:
+      void createUpdateMatrices(const size_t updateSize);
+
       double weight_;
+      ros::Publisher wheel_odom_score_pub_;
+      ros::Publisher laser_odom_score_pub_;
+      ros::Publisher pose_score_pub_;
+      size_t failed_update_count_;
+      double update_score_;
+
+      // Update Matrices
+      boost::shared_ptr<Eigen::VectorXd> measurementSubset_;                        // z
+      boost::shared_ptr<Eigen::MatrixXd> measurementCovarianceSubset_;  // R
+      boost::shared_ptr<Eigen::MatrixXd> stateToMeasurementSubset_;  // H
+      boost::shared_ptr<Eigen::MatrixXd> kalmanGainSubset_;          // K
+      boost::shared_ptr<Eigen::VectorXd> innovationSubset_;
   };
 
 
@@ -319,6 +376,7 @@ private:
     Hypothesis::Ptr active_;
     std::vector<Hypothesis::Ptr> hypotheses_;
     size_t max_hypotheses_;
+    size_t max_update_failures_;
 };
 
 }  // namespace RobotLocalization

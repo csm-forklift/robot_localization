@@ -41,6 +41,7 @@
 #include <sstream>
 #include <vector>
 #include <boost/foreach.hpp>
+#include <std_msgs/Float64.h>
 
 namespace RobotLocalization
 {
@@ -57,6 +58,10 @@ namespace RobotLocalization
     FilterBase(),  // Must initialize filter base!
     weight_(1.0)
   {
+    ros::NodeHandle n;
+    wheel_odom_score_pub_ = n.advertise<std_msgs::Float64>("wheel_odom_score", 1000);
+    laser_odom_score_pub_ = n.advertise<std_msgs::Float64>("laser_odom_score", 1000);
+    pose_score_pub_ = n.advertise<std_msgs::Float64>("pose_score", 1000);
   }
 
   Hypothesis::~Hypothesis()
@@ -103,12 +108,13 @@ namespace RobotLocalization
     size_t updateSize = updateIndices.size();
 
     // Now set up the relevant matrices
-    Eigen::VectorXd stateSubset(updateSize);                              // x (in most literature)
-    Eigen::VectorXd measurementSubset(updateSize);                        // z
-    Eigen::MatrixXd measurementCovarianceSubset(updateSize, updateSize);  // R
-    Eigen::MatrixXd stateToMeasurementSubset(updateSize, state_.rows());  // H
-    Eigen::MatrixXd kalmanGainSubset(state_.rows(), updateSize);          // K
-    Eigen::VectorXd innovationSubset(updateSize);                         // z - Hx
+    Eigen::VectorXd stateSubset(updateSize);                                 // x (in most literature)
+    createUpdateMatrices(updateSize);
+    auto& measurementSubset           = *measurementSubset_;            // z
+    auto& measurementCovarianceSubset = *measurementCovarianceSubset_;  // R
+    auto& stateToMeasurementSubset    = *stateToMeasurementSubset_;     // H
+    auto& kalmanGainSubset            = *kalmanGainSubset_;             // K
+    auto& innovationSubset            = *innovationSubset_;             // z - Hx
 
     stateSubset.setZero();
     measurementSubset.setZero();
@@ -194,39 +200,82 @@ namespace RobotLocalization
       }
     }
 
+    // update_score_ = std::exp(-0.5 * innovationSubset.dot(hphrInv * innovationSubset));
+    // update_score_ /= std::sqrt(two_pi_n() * hphr.determinant());
+
+    update_score_ = std::sqrt(innovationSubset.dot(hphrInv * innovationSubset));
+
+    //ROS_ERROR_STREAM(" Weight "<<update_score_ << measurement.topicName_);
+
+
+    if (measurement.topicName_ == "odom0_twist")
+    {
+       wheel_odom_score_pub_.publish(update_score_);
+    }
+    if (measurement.topicName_ == "odom1_twist")
+    {
+       laser_odom_score_pub_.publish(update_score_);
+    }
+    if (measurement.topicName_ == "pose0")
+    {
+       pose_score_pub_.publish(update_score_);
+    }
+
     // (2) Check Mahalanobis distance between mapped measurement and state.
     if (checkMahalanobisThreshold(innovationSubset, hphrInv, measurement.mahalanobisThresh_))
+    //if (update_score_ < 0.1 || measurement.topicName_ != "odom0_twist")
     {
-      // (3) Apply the gain to the difference between the state and measurement: x = x + K(z - Hx)
-      state_.noalias() += kalmanGainSubset * innovationSubset;
-
-      // (4) Update the estimate error covariance using the Joseph form: (I - KH)P(I - KH)' + KRK'
-      Eigen::MatrixXd gainResidual = identity_;
-      gainResidual.noalias() -= kalmanGainSubset * stateToMeasurementSubset;
-      estimateErrorCovariance_ = gainResidual * estimateErrorCovariance_ * gainResidual.transpose();
-      estimateErrorCovariance_.noalias() += kalmanGainSubset *
-                                            measurementCovarianceSubset *
-                                            kalmanGainSubset.transpose();
-
-      // Handle wrapping of angles
-      wrapStateAngles();
-
-      FB_DEBUG("Kalman gain subset is:\n" << kalmanGainSubset <<
-               "\nInnovation is:\n" << innovationSubset <<
-               "\nCorrected full state is:\n" << state_ <<
-               "\nCorrected full estimate error covariance is:\n" << estimateErrorCovariance_ <<
-               "\n\n---------------------- /Ekf::correct ----------------------\n");
-
+      applyUpdate();
     }
     else
     {
-      ROS_ERROR_STREAM(" Measurement "<<measurement.topicName_<<" rejected because of covariance check");
+      ROS_ERROR_STREAM(" Measurement "<<measurement.topicName_<<" rejected because of covariance check "<<update_score_ << measurement.topicName_);
+      this->failed_update_count_++;
     }
 
-     auto weight = std::exp(-0.5 * innovationSubset.dot(hphrInv * innovationSubset));
-     weight /= std::sqrt(two_pi_n() * hphr.determinant());
-     ROS_ERROR_STREAM(" Weight "<<weight);
-     weight_ *= weight;
+  }
+
+
+  void Hypothesis::applyUpdate()
+  {
+    auto& measurementSubset           = *measurementSubset_;            // z
+    auto& measurementCovarianceSubset = *measurementCovarianceSubset_;  // R
+    auto& stateToMeasurementSubset    = *stateToMeasurementSubset_;     // H
+    auto& kalmanGainSubset            = *kalmanGainSubset_;             // K
+    auto& innovationSubset            = *innovationSubset_;             // z - Hx
+
+    // (3) Apply the gain to the difference between the state and measurement: x = x + K(z - Hx)
+    state_.noalias() += kalmanGainSubset * innovationSubset;
+
+    // (4) Update the estimate error covariance using the Joseph form: (I - KH)P(I - KH)' + KRK'
+    Eigen::MatrixXd gainResidual = identity_;
+    gainResidual.noalias() -= kalmanGainSubset * stateToMeasurementSubset;
+    estimateErrorCovariance_ = gainResidual * estimateErrorCovariance_ * gainResidual.transpose();
+    estimateErrorCovariance_.noalias() += kalmanGainSubset *
+                                          measurementCovarianceSubset *
+                                          kalmanGainSubset.transpose();
+
+    // Handle wrapping of angles
+    wrapStateAngles();
+
+    FB_DEBUG("Kalman gain subset is:\n" << kalmanGainSubset <<
+             "\nInnovation is:\n" << innovationSubset <<
+             "\nCorrected full state is:\n" << state_ <<
+             "\nCorrected full estimate error covariance is:\n" << estimateErrorCovariance_ <<
+             "\n\n---------------------- /Ekf::correct ----------------------\n");
+    this->failed_update_count_ = 0;
+    weight_ *= update_score_;
+  }
+
+  void Hypothesis::createUpdateMatrices(const size_t updateSize)
+  {
+    using vec_alloc = Eigen::aligned_allocator<Eigen::VectorXd>;
+    using mat_alloc = Eigen::aligned_allocator<Eigen::MatrixXd>;
+    measurementSubset_           = boost::allocate_shared<Eigen::VectorXd>(vec_alloc(), updateSize);
+    measurementCovarianceSubset_ = boost::allocate_shared<Eigen::MatrixXd>(mat_alloc(), updateSize, updateSize);
+    stateToMeasurementSubset_    = boost::allocate_shared<Eigen::MatrixXd>(mat_alloc(), updateSize, state_.rows());
+    kalmanGainSubset_            = boost::allocate_shared<Eigen::MatrixXd>(mat_alloc(), state_.rows(), updateSize);
+    innovationSubset_            = boost::allocate_shared<Eigen::VectorXd>(vec_alloc(), updateSize);
   }
 
   void Hypothesis::predict(const double referenceTime, const double delta)
@@ -424,7 +473,8 @@ namespace RobotLocalization
 
   MhEkf::MhEkf(std::vector<double>) :
     FilterBase(),  // Must initialize filter base!
-    max_hypotheses_(4)
+    max_hypotheses_(4),
+    max_update_failures_(15)
   {
     active_ = boost::make_shared<Hypothesis>();
     hypotheses_.push_back(active_);
@@ -436,17 +486,55 @@ namespace RobotLocalization
 
   void MhEkf::updateHypotheses()
   {
-    const auto sum = std::accumulate(hypotheses_.begin(), hypotheses_.end(), 0.0, [](double v, const Hypothesis::Ptr& h)
+    using Compare = Hypothesis::PtrComp;
+    //Check if we need to fork a new hypothesis
+    const auto& hypothesis_checker = [](const Hypothesis::Ptr& hypothesis)->bool
+    {
+      return hypothesis->failedUpdatesCount();
+    };
+
+    if (std::all_of(hypotheses_.begin(), hypotheses_.end(), hypothesis_checker))
+    {
+      const auto hypothesis_ptr = *(std::min_element(hypotheses_.begin(), hypotheses_.end(),Compare(Compare::ByUpdateScore)));
+      auto hypothesis = boost::make_shared<Hypothesis>(*hypothesis_ptr);
+      // Note that hypothesis will be sharing the same update matrices as the hypothesis
+      // it's cloned from. But that's fine because each will create its own new matrices
+      // when a new measurement comes.
+      hypothesis->applyUpdate();
+      hypotheses_.push_back(hypothesis);
+    }
+
+    //Pruning hypotheses
+    auto it = hypotheses_.begin();
+    for (; it != hypotheses_.end();)
+    {
+      if ((*it)->failedUpdatesCount() > max_update_failures_)
       {
-        return v + h->getWeight();
-      });
+        it = hypotheses_.erase(it);
+      }
+      else
+      {
+        // Increase weight on un=updated hypotheses.
+        ++it;
+      }
+    }
+
+    if (hypotheses_.size() > max_hypotheses_)
+    {
+      hypotheses_.erase(std::max_element(hypotheses_.begin(), hypotheses_.end(), Compare(Compare::ByWeight)));
+    }
+
+    /*const auto sum = std::accumulate(hypotheses_.begin(), hypotheses_.end(), 0.0, [](double v, const Hypothesis::Ptr& h)
+    {
+     return v + h->getWeight();
+    });
 
     for (auto& hypothesis : hypotheses_)
     {
       hypothesis->getWeight() /= sum;
-    }
+    }*/
 
-    active_ = *(std::min_element(hypotheses_.begin(), hypotheses_.end(), Hypothesis::PtrComp()));
+    active_ = *(std::min_element(hypotheses_.begin(), hypotheses_.end(), Compare(Compare::ByWeight)));
   }
 
   /**
