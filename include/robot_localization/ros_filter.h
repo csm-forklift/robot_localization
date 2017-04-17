@@ -40,6 +40,7 @@
 #include <robot_localization/SetPose.h>
 
 #include <ros/ros.h>
+#include <std_srvs/Empty.h>
 #include <std_msgs/String.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/Imu.h>
@@ -239,6 +240,13 @@ template<class T> class RosFilter
     //! @return true if successful, false if not
     bool setPoseSrvCallback(robot_localization::SetPose::Request& request,
                             robot_localization::SetPose::Response&);
+
+    //! @brief Service callback for disabling filter until setPose is sent
+    //!
+    //! @param[in] request - Empty request
+    //! @return true if successful, false if not
+    bool disableSrvCallback(std_srvs::Empty::Request& request,
+                            std_srvs::Empty::Response&);
 
     //! @brief Converts tf message filter failures to strings
     //! @param[in] reason - The failure reason object
@@ -534,6 +542,14 @@ template<class T> class RosFilter
     //! a custom SetPose service.
     //!
     ros::ServiceServer setPoseSrv_;
+
+    //! @brief Service that disables the filter until a setPose is sent
+    //!
+    ros::ServiceServer disableSrv_;
+
+    //! @brief Wheter the filter is currently disabled
+    //!
+    bool disabled_;
 
     //! @brief Whether or not we use smoothing
     //!

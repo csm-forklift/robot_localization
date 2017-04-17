@@ -65,7 +65,8 @@ namespace RobotLocalization
       publishAcceleration_(false),
       twoDMode_(false),
       useControl_(false),
-      smoothLaggedData_(false)
+      smoothLaggedData_(false),
+      disabled_(false)
   {
     stateVariableNames_.push_back("X");
     stateVariableNames_.push_back("Y");
@@ -856,6 +857,9 @@ namespace RobotLocalization
 
     // Create a service for manually setting/resetting pose
     setPoseSrv_ = nh_.advertiseService("set_pose", &RosFilter<T>::setPoseSrvCallback, this);
+
+    // Create a service for disabling filter
+    disableSrv_ = nhLocal_.advertiseService("disable", &RosFilter<T>::disableSrvCallback, this);
 
     // Init the last last measurement time so we don't get a huge initial delta
     filter_.setLastMeasurementTime(ros::Time::now().toSec());
@@ -1712,7 +1716,7 @@ namespace RobotLocalization
       // Get latest state and publish it
       nav_msgs::Odometry filteredPosition;
 
-      if (getFilteredOdometryMessage(filteredPosition))
+      if (!disabled_ && getFilteredOdometryMessage(filteredPosition))
       {
         worldBaseLinkTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
         worldBaseLinkTransMsg_.header.frame_id = filteredPosition.header.frame_id;
@@ -1828,6 +1832,7 @@ namespace RobotLocalization
     RF_DEBUG("------ RosFilter::setPoseCallback ------\nPose message:\n" << *msg);
 
     std::string topicName("setPose");
+    disabled_ = false;
 
     // Get rid of any initial poses (pretend we've never had a measurement)
     initialMeasurements_.clear();
@@ -1884,6 +1889,13 @@ namespace RobotLocalization
     setPoseCallback(msg);
 
     return true;
+  }
+
+  template<typename T>
+  bool RosFilter<T>::disableSrvCallback(std_srvs::Empty::Request& request, std_srvs::Empty::Response&)
+  {
+    disabled_ = true;
+    return disabled_;
   }
 
   template<typename T>
