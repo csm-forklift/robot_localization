@@ -152,6 +152,18 @@ If fusing accelerometer data from IMUs, this parameter determines whether or not
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 If ``imuN_remove_gravitational_acceleration`` is set to ``true``, then this parameter determines the acceleration in Z due to gravity that will be removed from the IMU's linear acceleration data. Default is 9.80665 (m/s^2).
 
+~initial_state
+^^^^^^^^^^^^^^
+Starts the filter with the specified state. The state is given as a 15-D vector of doubles, in the same order as the sensor configurations. For example, to start your robot at a position of :math:`(5.0, 4.0, 3.0)`, a :math:`yaw` of :math:`1.57`, and a linear velocity of :math:`(0.1, 0.2, 0.3)`, you would use:
+
+.. code-block:: xml
+
+ <rosparam param="initial_state">[5.0,  4.0,  3.0,
+                                  0.0,  0.0,  1.57,
+                                  0.1,  0.2,  0.3,
+                                  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0]</rosparam>
+
 ~publish_tf
 ^^^^^^^^^^^
 If *true*, the state estimation node will publish the transform from the frame specified by the ``world_frame`` parameter to the frame specified by the ``base_link_frame`` parameter. Defaults to *true*.
@@ -269,6 +281,10 @@ If *true*, will dynamically scale the ``process_noise_covariance`` based on the 
 ~initial_estimate_covariance
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 The estimate covariance, commonly denoted *P*, defines the error in the current state estimate. The parameter allows users to set the initial value for the matrix, which will affect how quickly the filter converges. For example, if users set the value at position :math:`[0, 0]` to a very small value, e.g., `1e-12`, and then attempt to fuse measurements of X position with a high variance value for :math:`X`, then the filter will be very slow to "trust" those measurements, and the time required for convergence will increase. Again, users should take care with this parameter. When only fusing velocity data (e.g., no absolute pose information), users will likely *not* want to set the initial covariance values for the absolute pose variables to large numbers. This is because those errors are going to grow without bound (owing to the lack of absolute pose measurements to reduce the error), and starting them with large values will not benefit the state estimate.
+
+~reset_on_time_jump
+^^^^^^^^^^^^^^^^^^^
+If set to *true* and ``ros::Time::isSimTime()`` is *true*, the filter will reset to its uninitialized state when a jump back in time is detected on a topic. This is useful when working with bag data, in that the bag can be restarted without restarting the node.
 
 Node-specific Parameters
 ------------------------

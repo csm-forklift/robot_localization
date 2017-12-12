@@ -37,7 +37,7 @@
 #include "robot_localization/ros_filter_utilities.h"
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <xmlrpcpp/XmlRpcException.h>
+#include <XmlRpcException.h>
 
 #include <string>
 
@@ -49,6 +49,7 @@ namespace RobotLocalization
     yaw_offset_(0.0),
     transform_timeout_(ros::Duration(0)),
     broadcast_utm_transform_(false),
+    broadcast_utm_transform_as_parent_frame_(false),
     has_transform_odom_(false),
     has_transform_gps_(false),
     has_transform_imu_(false),
@@ -88,6 +89,7 @@ namespace RobotLocalization
     nh_priv.getParam("magnetic_declination_radians", magnetic_declination_);
     nh_priv.param("yaw_offset", yaw_offset_, 0.0);
     nh_priv.param("broadcast_utm_transform", broadcast_utm_transform_, false);
+    nh_priv.param("broadcast_utm_transform_as_parent_frame", broadcast_utm_transform_as_parent_frame_, false);
     nh_priv.param("zero_altitude", zero_altitude_, false);
     nh_priv.param("publish_filtered_gps", publish_gps_, false);
     nh_priv.param("use_odometry_yaw", use_odometry_yaw_, false);
@@ -124,7 +126,7 @@ namespace RobotLocalization
         }
 
         std::ostringstream ostr;
-        ostr << datum_config[0] << " " << datum_config[1] << " " << datum_config[2];
+        ostr << std::setprecision(20) << datum_config[0] << " " << datum_config[1] << " " << datum_config[2];
         std::istringstream istr(ostr.str());
         istr >> datum_lat >> datum_lon >> datum_yaw;
 
@@ -267,7 +269,8 @@ namespace RobotLocalization
       imu_yaw += (magnetic_declination_ + yaw_offset_);
 
       ROS_INFO_STREAM("Corrected for magnetic declination of " << std::fixed << magnetic_declination_ <<
-                      " and user-specified offset of " << yaw_offset_ << ". Transform heading factor is now " << imu_yaw);
+                      " and user-specified offset of " << yaw_offset_ << "." <<
+                      " Transform heading factor is now " << imu_yaw);
 
       // Convert to tf-friendly structures
       tf2::Quaternion imu_quat;
@@ -294,10 +297,12 @@ namespace RobotLocalization
       {
         geometry_msgs::TransformStamped utm_transform_stamped;
         utm_transform_stamped.header.stamp = ros::Time::now();
-        utm_transform_stamped.header.frame_id = world_frame_id_;
-        utm_transform_stamped.child_frame_id = "utm";
-        utm_transform_stamped.transform = tf2::toMsg(utm_world_transform_);
-        utm_transform_stamped.transform.translation.z = (zero_altitude_ ? 0.0 : utm_transform_stamped.transform.translation.z);
+        utm_transform_stamped.header.frame_id = (broadcast_utm_transform_as_parent_frame_ ? "utm" : world_frame_id_);
+        utm_transform_stamped.child_frame_id = (broadcast_utm_transform_as_parent_frame_ ? world_frame_id_ : "utm");
+        utm_transform_stamped.transform = (broadcast_utm_transform_as_parent_frame_ ?
+                                             tf2::toMsg(utm_world_trans_inverse_) : tf2::toMsg(utm_world_transform_));
+        utm_transform_stamped.transform.translation.z = (zero_altitude_ ?
+                                                           0.0 : utm_transform_stamped.transform.translation.z);
         utm_broadcaster_.sendTransform(utm_transform_stamped);
       }
     }
@@ -424,7 +429,10 @@ namespace RobotLocalization
 
       if (can_transform)
       {
+        // Zero out rotation because we don't care about the orientation of the
+        // GPS receiver relative to base_link
         gps_offset_rotated.setOrigin(tf2::quatRotate(robot_orientation.getRotation(), gps_offset_rotated.getOrigin()));
+        gps_offset_rotated.setRotation(tf2::Quaternion::getIdentity());
         robot_odom_pose = gps_offset_rotated.inverse() * gps_odom_pose;
       }
       else
@@ -553,9 +561,9 @@ namespace RobotLocalization
 
     tf2::fromMsg(msg->pose.pose, latest_world_pose_);
     latest_odom_covariance_.setZero();
-    for(size_t row = 0; row < POSE_SIZE; ++row)
+    for (size_t row = 0; row < POSE_SIZE; ++row)
     {
-      for(size_t col = 0; col < POSE_SIZE; ++col)
+      for (size_t col = 0; col < POSE_SIZE; ++col)
       {
         latest_odom_covariance_(row, col) = msg->pose.covariance[row * POSE_SIZE + col];
       }

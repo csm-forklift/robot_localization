@@ -33,7 +33,7 @@
 #include "robot_localization/ekf.h"
 #include "robot_localization/filter_common.h"
 
-#include <xmlrpcpp/XmlRpcException.h>
+#include <XmlRpcException.h>
 
 #include <iomanip>
 #include <limits>
@@ -180,7 +180,7 @@ namespace RobotLocalization
         }
       }
     }
-    
+
     // (2) Check Mahalanobis distance between mapped measurement and state.
     if (checkMahalanobisThreshold(innovationSubset, hphrInv, measurement.mahalanobisThresh_))
     {
