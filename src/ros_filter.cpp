@@ -1935,6 +1935,15 @@ namespace RobotLocalization
         lastDiagTime = curTime;
       }
 
+      // FIXME(jservos): THIS IS A HACK TO DETECT A BUG
+      if ( lastMessageTimes_.count("odom0_twist") != 0 &&
+          (ros::Time::now() - lastMessageTimes_["odom0_twist"]).toSec() > 20 )
+      {
+        // Kills itself on losing odom
+        ROS_ERROR("EKF NO LONGER RECEIVING ODOMETRY!!");
+        throw std::runtime_error("EKF failed to receive odom");
+      }
+
       // Clear out expired history data
       if (smoothLaggedData_)
       {
