@@ -63,6 +63,7 @@ namespace RobotLocalization
       printDiagnostics_(true),
       gravitationalAcc_(9.80665),
       publishTransform_(true),
+      invertTransform_(false),
       publishAcceleration_(false),
       twoDMode_(false),
       useControl_(false),
@@ -738,6 +739,9 @@ namespace RobotLocalization
 
     // Whether we're publshing the world_frame->base_link_frame transform
     nhLocal_.param("publish_tf", publishTransform_, true);
+
+    // Whether we're publshing the the inverse transfrom, ie. base_link_frame-world_frame transform
+    nhLocal_.param("invert_tf", invertTransform_, false);
 
     // Whether we're publishing the acceleration state transform
     nhLocal_.param("publish_acceleration", publishAcceleration_, false);
@@ -1837,6 +1841,15 @@ namespace RobotLocalization
           {
             if (filteredPosition.header.frame_id == odomFrameId_)
             {
+              if (invertTransform_)
+              {
+                tf2::Transform worldBaseLinkTrans;
+                tf2::fromMsg(worldBaseLinkTransMsg_.transform, worldBaseLinkTrans);
+                worldBaseLinkTransMsg_.transform = tf2::toMsg(worldBaseLinkTrans.inverse());
+                worldBaseLinkTransMsg_.child_frame_id = filteredPosition.header.frame_id;
+                worldBaseLinkTransMsg_.header.frame_id = filteredPosition.child_frame_id;
+                worldBaseLinkTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
+              }
               worldTransformBroadcaster.sendTransform(worldBaseLinkTransMsg_);
             }
             else if (filteredPosition.header.frame_id == mapFrameId_)
@@ -1879,11 +1892,20 @@ namespace RobotLocalization
 
                 mapOdomTrans.mult(worldBaseLinkTrans, odomBaseLinkTrans);
 
-                mapOdomTransMsg.transform = tf2::toMsg(mapOdomTrans);
-                mapOdomTransMsg.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
-                mapOdomTransMsg.header.frame_id = mapFrameId_;
-                mapOdomTransMsg.child_frame_id = odomFrameId_;
+                if (invertTransform_)
+                {
+                  mapOdomTransMsg.transform = tf2::toMsg(mapOdomTrans.inverse());
+                  mapOdomTransMsg.header.frame_id = odomFrameId_;
+                  mapOdomTransMsg.child_frame_id = mapFrameId_;
+                }
+                else
+                {
+                  mapOdomTransMsg.transform = tf2::toMsg(mapOdomTrans);
+                  mapOdomTransMsg.header.frame_id = mapFrameId_;
+                  mapOdomTransMsg.child_frame_id = odomFrameId_;
+                }
 
+                mapOdomTransMsg.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
                 worldTransformBroadcaster.sendTransform(mapOdomTransMsg);
               }
               catch(...)
