@@ -566,7 +566,7 @@ template<class T> class RosFilter
     //!
     ros::ServiceServer disableSrv_;
 
-    //! @brief Wheter the filter is currently disabled
+    //! @brief Whether the filter is currently disabled or not. See disabledAtStartup_.
     //!
     bool disabled_;
 
@@ -616,9 +616,6 @@ template<class T> class RosFilter
     //! but does not integrate new messages into the state vector.
     //! The filter can be enabled later using a service.
     bool disabledAtStartup_;
-
-    //! @brief Whether the filter is enabled or not. See disabledAtStartup_.
-    bool enabled_;
 
     //! @brief Message that contains our latest transform (i.e., state)
     //!

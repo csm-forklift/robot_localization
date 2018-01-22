@@ -68,8 +68,7 @@ namespace RobotLocalization
       useControl_(false),
       smoothLaggedData_(false),
       disabled_(false),
-      disabledAtStartup_(false),
-      enabled_(false)
+      disabledAtStartup_(false)
   {
     stateVariableNames_.push_back("X");
     stateVariableNames_.push_back("Y");
@@ -897,8 +896,12 @@ namespace RobotLocalization
 
     // Check if the filter should start or not
     nhLocal_.param("disabled_at_startup", disabledAtStartup_, false);
-    enabled_ = !disabledAtStartup_;
+    disabled_ = disabledAtStartup_;
 
+    if (disabled_)
+    {
+      ROS_WARN_STREAM_ONCE("[" << ros::this_node::getName() << ":] This filter is disabled. To enable it call the service " << ros::this_node::getName() << "/enable");
+    }
 
     // Debugging writes to file
     RF_DEBUG("tf_prefix is " << tfPrefix <<
@@ -1789,17 +1792,6 @@ namespace RobotLocalization
     const ros::Duration loop_cycle_time(1.0 / frequency_);
     ros::Time loop_end_time = ros::Time::now();
 
-    // Wait for the filter to be enabled
-    while (!enabled_ && ros::ok())
-    {
-      ROS_WARN_STREAM_ONCE("[" << ros::this_node::getName() << ":] This filter is disabled. To enable it call the service " << ros::this_node::getName() << "/enable");
-      ros::spinOnce();
-      if (enabled_)
-      {
-        break;
-      }
-    }
-
     while (ros::ok())
     {
       // The spin will call all the available callbacks and enqueue
@@ -2038,11 +2030,14 @@ namespace RobotLocalization
                                              std_srvs::Empty::Response&)
   {
     RF_DEBUG("\n[" << ros::this_node::getName() << ":]" << " ------ /RosFilter::enableFilterSrvCallback ------\n");
-    if (enabled_) {
-      ROS_WARN_STREAM("[" << ros::this_node::getName() << ":] Asking for enabling filter service, but the filter was already enabled! Use param disabled_at_startup.");
-    } else {
+    if (disabled_)
+    {
       ROS_INFO_STREAM("[" << ros::this_node::getName() << ":] Enabling filter...");
-      enabled_ = true;
+      disabled_ = false;
+    }
+    else
+    {
+      ROS_WARN_STREAM("[" << ros::this_node::getName() << ":] Asking for enabling filter service, but the filter was already enabled! Use param disabled_at_startup.");
     }
     return true;
   }
