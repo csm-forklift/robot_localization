@@ -737,10 +737,10 @@ namespace RobotLocalization
     FilterUtilities::appendPrefix(tfPrefix, baseLinkFrameId_);
     FilterUtilities::appendPrefix(tfPrefix, worldFrameId_);
 
-    // Whether we're publshing the world_frame->base_link_frame transform
+    // Whether we're publishing the world_frame->base_link_frame transform
     nhLocal_.param("publish_tf", publishTransform_, true);
 
-    // Whether we're publshing the the inverse transfrom, ie. base_link_frame-world_frame transform
+    // Whether we're publishing the the inverse transfrom, ie. base_link_frame->world_frame transform
     nhLocal_.param("invert_tf", invertTransform_, false);
 
     // Whether we're publishing the acceleration state transform
