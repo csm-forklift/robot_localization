@@ -633,6 +633,10 @@ template<class T> class RosFilter
     //!
     bool publishTransform_;
 
+    //! @brief Whether we're publishing the the inverse transfrom, ie. base_link_frame->world_frame transform
+    //!
+    bool invertTransform_;
+
     //! @brief Whether we publish the acceleration
     //!
     bool publishAcceleration_;
