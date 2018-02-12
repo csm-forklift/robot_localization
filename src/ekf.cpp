@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <ros/ros.h>
 #include "robot_localization/ekf.h"
 #include "robot_localization/filter_common.h"
 
@@ -203,6 +204,10 @@ namespace RobotLocalization
                "\nCorrected full state is:\n" << state_ <<
                "\nCorrected full estimate error covariance is:\n" << estimateErrorCovariance_ <<
                "\n\n---------------------- /Ekf::correct ----------------------\n");
+    }
+    else
+    {
+      ROS_WARN("Rejecting measurement due to Mahalanobis Threshold");
     }
   }
 

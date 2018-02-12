@@ -3047,6 +3047,7 @@ namespace RobotLocalization
     else
     {
       RF_DEBUG("Could not transform measurement into " << targetFrame << ". Ignoring...");
+      ROS_ERROR_STREAM("Could not transform measurement into " << targetFrame << " to " << msgFrame << ". Ignoring...");
     }
 
     RF_DEBUG("\n----- /RosFilter::prepareTwist (" << topicName << ") ------\n");
