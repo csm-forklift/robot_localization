@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(robot_localization)
 
-# FIXME(jservos): AVX possibly causing memory corruption in Eigen
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-avx")
-
 find_package(catkin REQUIRED COMPONENTS
   diagnostic_msgs
   diagnostic_updater
