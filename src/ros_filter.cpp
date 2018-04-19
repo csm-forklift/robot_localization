@@ -537,7 +537,7 @@ namespace RobotLocalization
         const double firstMeasurementTime = firstMeasurement->time_;
         const std::string firstMeasurementTopicName = firstMeasurement->topicName_;
 
-        int originalCount = static_cast<int>(measurementQueue_.size());
+        const int originalCount = static_cast<int>(measurementQueue_.size());
         if (!revertTo(firstMeasurementTime - 1e-9))
         {
           RF_DEBUG("ERROR: history interval is too small to revert to time " << firstMeasurementTime << "\n");
