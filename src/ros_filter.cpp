@@ -532,12 +532,17 @@ namespace RobotLocalization
         RF_DEBUG("Received a measurement that was " << filter_.getLastMeasurementTime() - firstMeasurement->time_ <<
                  " seconds in the past. Reverting filter state and measurement queue...");
 
+        // Copy first measurement time and topic name so we can use them if revertTo fails, because it can change the
+        // measurement queue and invalidate the first measurement reference.
+        const double firstMeasurementTime = firstMeasurement->time_;
+        const std::string firstMeasurementTopicName = firstMeasurement->topicName_;
+
         int originalCount = static_cast<int>(measurementQueue_.size());
-        if (!revertTo(firstMeasurement->time_ - 1e-9))
+        if (!revertTo(firstMeasurementTime - 1e-9))
         {
-          RF_DEBUG("ERROR: history interval is too small to revert to time " << firstMeasurement->time_ << "\n");
+          RF_DEBUG("ERROR: history interval is too small to revert to time " << firstMeasurementTime << "\n");
           ROS_WARN_STREAM_DELAYED_THROTTLE(historyLength_, "Received old measurement for topic " <<
-            firstMeasurement->topicName_ << ", but history interval is insufficiently sized to revert state and "
+            firstMeasurementTopicName << ", but history interval is insufficiently sized to revert state and "
             "measurement queue.");
           restoredMeasurementCount = 0;
         }
