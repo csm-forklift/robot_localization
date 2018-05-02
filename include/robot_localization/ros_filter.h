@@ -624,7 +624,15 @@ template<class T> class RosFilter
     //! If this is true, the filter reads parameters and prepares publishers and subscribes
     //! but does not integrate new messages into the state vector.
     //! The filter can be enabled later using a service.
+    //!
     bool disabledAtStartup_;
+
+    //! @brief Silence the multiple absolut pose inputs warning
+    //!
+    //! If this is true, the warning about multiple absolute pose inputs being used is silenced.
+    //! It defaults to false, so the user has to explicitly silence it.
+    //!
+    bool silence_multiple_absolute_pose_inputs_warning_;
 
     //! @brief Message that contains our latest transform (i.e., state)
     //!
