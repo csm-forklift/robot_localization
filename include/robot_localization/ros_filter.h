@@ -490,6 +490,15 @@ template<class T> class RosFilter
     //!
     std::map<std::string, ros::Time> lastMessageTimes_;
 
+    //! @brief Store the expected period for each topic
+    //!
+    //! If the last time a message was recieved from each topic is greater
+    //! than the expected period a diagnostic warning message is sent.
+    //! By default, if not set, the period is 0.0, which means that no
+    //! check is performed.
+    //!
+    std::map<std::string, double> topicExpectedPeriods_;
+
     //! @brief Store the last time set pose message was received
     //!
     //! If we receive a setPose message to reset the filter, we can get in

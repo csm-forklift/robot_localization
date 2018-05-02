@@ -1053,6 +1053,11 @@ namespace RobotLocalization
                         true);
         }
 
+        double expected_frequency = 0.0;
+        nhLocal_.param(odomTopicName + "_expected_frequency", expected_frequency, expected_frequency);
+
+        topicExpectedPeriods_[odomTopicName] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
+
         if (poseUpdateSum > 0)
         {
           if (differential)
@@ -1195,6 +1200,11 @@ namespace RobotLocalization
                           "but all pose update variables are false");
         }
 
+        double expected_frequency = 0.0;
+        nhLocal_.param(poseTopicName + "_expected_frequency", expected_frequency, expected_frequency);
+
+        topicExpectedPeriods_[poseTopicName] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
+
         RF_DEBUG("Subscribed to " << poseTopic << " (" << poseTopicName << ")\n\t" <<
                  poseTopicName << "_differential is " << (differential ? "true" : "false") << "\n\t" <<
                  poseTopicName << "_rejection_threshold is " << poseMahalanobisThresh << "\n\t" <<
@@ -1270,6 +1280,11 @@ namespace RobotLocalization
           ROS_WARN_STREAM("Warning: " << twistTopic << " is listed as an input topic, "
                           "but all twist update variables are false");
         }
+
+        double expected_frequency = 0.0;
+        nhLocal_.param(twistTopicName + "_expected_frequency", expected_frequency, expected_frequency);
+
+        topicExpectedPeriods_[twistTopicName] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
 
         RF_DEBUG("Subscribed to " << twistTopic << " (" << twistTopicName << ")\n\t" <<
                  twistTopicName << "_rejection_threshold is " << twistMahalanobisThresh << "\n\t" <<
@@ -1416,6 +1431,11 @@ namespace RobotLocalization
           ROS_WARN_STREAM("Warning: " << imuTopic << " is listed as an input topic, "
                           "but all its update variables are false");
         }
+
+        double expected_frequency = 0.0;
+        nhLocal_.param(imuTopicName + "_expected_frequency", expected_frequency, expected_frequency);
+
+        topicExpectedPeriods_[imuTopicName] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
 
         if (poseUpdateSum > 0)
         {
@@ -1976,6 +1996,34 @@ namespace RobotLocalization
           if (printDiagnostics_)
           {
             freqDiag.tick();
+
+            for (std::map<std::string, ros::Time>::iterator timesIt = lastMessageTimes_.begin();
+                 timesIt != lastMessageTimes_.end();
+                 ++timesIt)
+            {
+              const std::string& topicName = timesIt->first;
+              const ros::Time& time = timesIt->second;
+
+              std::map<std::string, double>::iterator periodIt = topicExpectedPeriods_.find(topicName);
+              if (periodIt != topicExpectedPeriods_.end())
+              {
+                const double& expected_period = periodIt->second;
+                if (expected_period > 0.0)
+                {
+                  const double elapsed_time = (curTime - time).toSec();
+                  if (elapsed_time > expected_period)
+                  {
+                    std::stringstream stream;
+                    stream << "The last " << topicName << " message arrived " << elapsed_time <<
+                              " seconds ago, expected less than " << expected_period;
+                    addDiagnostic(diagnostic_msgs::DiagnosticStatus::WARN,
+                                  topicName + "_timestamp",
+                                  stream.str(),
+                                  false);
+                  }
+                }
+              }
+            }
           }
         }
 
