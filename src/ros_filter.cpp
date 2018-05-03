@@ -1060,7 +1060,8 @@ namespace RobotLocalization
         double expected_frequency = 0.0;
         nhLocal_.param(odomTopicName + "_expected_frequency", expected_frequency, expected_frequency);
 
-        topicExpectedPeriods_[odomTopicName] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
+        topicExpectedPeriods_[poseCallbackData.topicName_] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
+        topicExpectedPeriods_[twistCallbackData.topicName_] = topicExpectedPeriods_[poseCallbackData.topicName_];
 
         if (poseUpdateSum > 0)
         {
@@ -1197,17 +1198,17 @@ namespace RobotLocalization
             absPoseVarCounts[StateMemberPitch] += poseUpdateVec[StateMemberPitch];
             absPoseVarCounts[StateMemberYaw] += poseUpdateVec[StateMemberYaw];
           }
+
+          double expected_frequency = 0.0;
+          nhLocal_.param(poseTopicName + "_expected_frequency", expected_frequency, expected_frequency);
+
+          topicExpectedPeriods_[callbackData.topicName_] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
         }
         else
         {
           ROS_WARN_STREAM("Warning: " << poseTopic << " is listed as an input topic, "
                           "but all pose update variables are false");
         }
-
-        double expected_frequency = 0.0;
-        nhLocal_.param(poseTopicName + "_expected_frequency", expected_frequency, expected_frequency);
-
-        topicExpectedPeriods_[poseTopicName] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
 
         RF_DEBUG("Subscribed to " << poseTopic << " (" << poseTopicName << ")\n\t" <<
                  poseTopicName << "_differential is " << (differential ? "true" : "false") << "\n\t" <<
@@ -1278,17 +1279,17 @@ namespace RobotLocalization
           twistVarCounts[StateMemberVroll] += twistUpdateVec[StateMemberVroll];
           twistVarCounts[StateMemberVpitch] += twistUpdateVec[StateMemberVpitch];
           twistVarCounts[StateMemberVyaw] += twistUpdateVec[StateMemberVyaw];
+
+          double expected_frequency = 0.0;
+          nhLocal_.param(twistTopicName + "_expected_frequency", expected_frequency, expected_frequency);
+
+          topicExpectedPeriods_[callbackData.topicName_] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
         }
         else
         {
           ROS_WARN_STREAM("Warning: " << twistTopic << " is listed as an input topic, "
                           "but all twist update variables are false");
         }
-
-        double expected_frequency = 0.0;
-        nhLocal_.param(twistTopicName + "_expected_frequency", expected_frequency, expected_frequency);
-
-        topicExpectedPeriods_[twistTopicName] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
 
         RF_DEBUG("Subscribed to " << twistTopic << " (" << twistTopicName << ")\n\t" <<
                  twistTopicName << "_rejection_threshold is " << twistMahalanobisThresh << "\n\t" <<
@@ -1429,17 +1430,19 @@ namespace RobotLocalization
             nh_.subscribe<sensor_msgs::Imu>(imuTopic, imuQueueSize,
               boost::bind(&RosFilter<T>::imuCallback, this, _1, imuTopicName, poseCallbackData, twistCallbackData,
                 accelCallbackData), ros::VoidPtr(), hints));
+
+          double expected_frequency = 0.0;
+          nhLocal_.param(imuTopicName + "_expected_frequency", expected_frequency, expected_frequency);
+
+          topicExpectedPeriods_[poseCallbackData.topicName_] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
+          topicExpectedPeriods_[twistCallbackData.topicName_] = topicExpectedPeriods_[poseCallbackData.topicName_];
+          topicExpectedPeriods_[accelCallbackData.topicName_] = topicExpectedPeriods_[poseCallbackData.topicName_];
         }
         else
         {
           ROS_WARN_STREAM("Warning: " << imuTopic << " is listed as an input topic, "
                           "but all its update variables are false");
         }
-
-        double expected_frequency = 0.0;
-        nhLocal_.param(imuTopicName + "_expected_frequency", expected_frequency, expected_frequency);
-
-        topicExpectedPeriods_[imuTopicName] = expected_frequency == 0.0 ? 0.0 : 1.0 / expected_frequency;
 
         if (poseUpdateSum > 0)
         {
@@ -1748,7 +1751,7 @@ namespace RobotLocalization
     RF_DEBUG("------ RosFilter::poseCallback (" << topicName << ") ------\n" <<
              "Pose message:\n" << *msg);
 
-    // Put the initial value in the lastMessagTimes_ for this variable if it's empty
+    // Put the initial value in the lastMessageTimes_ for this variable if it's empty
     if (lastMessageTimes_.count(topicName) == 0)
     {
       lastMessageTimes_.insert(std::pair<std::string, ros::Time>(topicName, msg->header.stamp));
