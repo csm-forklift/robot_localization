@@ -95,7 +95,7 @@ catkin_package(
 include_directories(include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS})
 
 # Options
-option(${PROJECT_NAME}_USE_FAST_CLAMP_ROTATION "Use fast clamp rotation" ON)
+option(${PROJECT_NAME}_USE_FAST_CLAMP_ROTATION "Use fast clamp rotation" OFF)
 if(${PROJECT_NAME}_USE_FAST_CLAMP_ROTATION)
   add_definitions(-DFAST_CLAMP_ROTATION)
 endif(${PROJECT_NAME}_USE_FAST_CLAMP_ROTATION)
