@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(robot_localization)
 
 find_package(catkin REQUIRED COMPONENTS
+  angles
   diagnostic_msgs
   diagnostic_updater
   eigen_conversions
@@ -66,6 +67,7 @@ catkin_package(
     ros_robot_localization_listener
     ukf
   CATKIN_DEPENDS
+    angles
     cmake_modules
     diagnostic_msgs
     diagnostic_updater
@@ -91,6 +93,12 @@ catkin_package(
 ###########
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS})
+
+# Options
+option(${PROJECT_NAME}_USE_FAST_CLAMP_ROTATION "Use fast clamp rotation" OFF)
+if(${PROJECT_NAME}_USE_FAST_CLAMP_ROTATION)
+  add_definitions(-DFAST_CLAMP_ROTATION)
+endif(${PROJECT_NAME}_USE_FAST_CLAMP_ROTATION)
 
 # Library definitions
 add_library(filter_utilities src/filter_utilities.cpp)
