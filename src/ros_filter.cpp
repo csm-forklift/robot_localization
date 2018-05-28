@@ -127,9 +127,6 @@ namespace RobotLocalization
 
     // reset filter to uninitialized state
     filter_.reset();
-
-    // clear all waiting callbacks
-    ros::getGlobalCallbackQueue()->clear();
   }
 
   // @todo: Replace with AccelWithCovarianceStamped
@@ -2128,10 +2125,6 @@ namespace RobotLocalization
     filter_.setEstimateErrorCovariance(measurementCovariance);
 
     filter_.setLastMeasurementTime(ros::Time::now().toSec());
-
-    // This method can apparently cancel all callbacks, and may stop the executing of the very callback that we're
-    // currently in. Therefore, nothing of consequence should come after it.
-    ros::getGlobalCallbackQueue()->clear();
 
     RF_DEBUG("\n------ /RosFilter::setPoseCallback ------\n");
   }
