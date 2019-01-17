@@ -69,6 +69,8 @@ namespace RobotLocalization
       mapFrameId_("map"),
       odomFrameId_("odom"),
       worldFrameId_(odomFrameId_),
+      invertTransform_(false),
+      silence_multiple_absolute_pose_inputs_warning_(false),
       lastDiagTime_(0),
       lastSetPoseTime_(0),
       latestControlTime_(0),
@@ -167,9 +169,6 @@ namespace RobotLocalization
 
     // reset filter to uninitialized state
     filter_.reset();
-
-    // clear all waiting callbacks
-    ros::getGlobalCallbackQueue()->clear();
   }
 
   template<typename T>
@@ -803,8 +802,11 @@ namespace RobotLocalization
     FilterUtilities::appendPrefix(tfPrefix, baseLinkFrameId_);
     FilterUtilities::appendPrefix(tfPrefix, worldFrameId_);
 
-    // Whether we're publshing the world_frame->base_link_frame transform
+    // Whether we're publishing the world_frame->base_link_frame transform
     nhLocal_.param("publish_tf", publishTransform_, true);
+
+    // Whether we're publishing the the inverse transfrom, ie. base_link_frame->world_frame transform
+    nhLocal_.param("invert_tf", invertTransform_, false);
 
     // Whether we're publishing the acceleration state transform
     nhLocal_.param("publish_acceleration", publishAcceleration_, false);
@@ -966,6 +968,9 @@ namespace RobotLocalization
     enabled_ = !disabledAtStartup_;
 
 
+    // Check if the multiple absolute pose inputs warning should be silenced:
+    nhLocal_.param("silence_multiple_absolute_pose_inputs_warning", silence_multiple_absolute_pose_inputs_warning_, false);
+
     // Debugging writes to file
     RF_DEBUG("tf_prefix is " << tfPrefix <<
              "\nmap_frame is " << mapFrameId_ <<
@@ -1003,6 +1008,9 @@ namespace RobotLocalization
 
     // Create a service for manually enabling the filter
     enableFilterSrv_ = nhLocal_.advertiseService("enable", &RosFilter<T>::enableFilterSrvCallback, this);
+
+    // Create a service for disabling filter
+    disableSrv_ = nhLocal_.advertiseService("disable", &RosFilter<T>::disableSrvCallback, this);
 
     // Create a service for toggling processing new measurements while still publishing
     toggleFilterProcessingSrv_ =
@@ -1080,13 +1088,24 @@ namespace RobotLocalization
         bool nodelayOdom = false;
         nhLocal_.param(odomTopicName + "_nodelay", nodelayOdom, false);
 
+        bool udpOdom = false;
+        nhLocal_.param(odomTopicName + "_udp", udpOdom, false);
+
         // Store the odometry topic subscribers so they don't go out of scope.
         if (poseUpdateSum + twistUpdateSum > 0)
         {
+          ros::TransportHints hints;
+          hints.tcpNoDelay(nodelayOdom);
+
+          if (udpOdom)
+          {
+            hints.udp();
+          }
+
           topicSubs_.push_back(
             nh_.subscribe<nav_msgs::Odometry>(odomTopic, odomQueueSize,
               boost::bind(&RosFilter::odometryCallback, this, _1, odomTopicName, poseCallbackData, twistCallbackData),
-              ros::VoidPtr(), ros::TransportHints().tcpNoDelay(nodelayOdom)));
+              ros::VoidPtr(), hints));
         }
         else
         {
@@ -1184,6 +1203,9 @@ namespace RobotLocalization
         bool nodelayPose = false;
         nhLocal_.param(poseTopicName + "_nodelay", nodelayPose, false);
 
+        bool udpPose = false;
+        nhLocal_.param(poseTopicName + "_udp", udpPose, false);
+
         // Pull in the sensor's config, zero out values that are invalid for the pose type
         std::vector<int> poseUpdateVec = loadUpdateConfig(poseTopicName);
         std::fill(poseUpdateVec.begin() + POSITION_V_OFFSET,
@@ -1197,13 +1219,21 @@ namespace RobotLocalization
 
         if (poseUpdateSum > 0)
         {
+          ros::TransportHints hints;
+          hints.tcpNoDelay(nodelayPose);
+
+          if (udpPose)
+          {
+            hints.udp();
+          }
+
           const CallbackData callbackData(poseTopicName, poseUpdateVec, poseUpdateSum, differential, relative,
             poseMahalanobisThresh);
 
           topicSubs_.push_back(
             nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>(poseTopic, poseQueueSize,
               boost::bind(&RosFilter::poseCallback, this, _1, callbackData, worldFrameId_, false),
-              ros::VoidPtr(), ros::TransportHints().tcpNoDelay(nodelayPose)));
+              ros::VoidPtr(), hints));
 
           if (differential)
           {
@@ -1266,6 +1296,9 @@ namespace RobotLocalization
         bool nodelayTwist = false;
         nhLocal_.param(twistTopicName + "_nodelay", nodelayTwist, false);
 
+        bool udpTwist = false;
+        nhLocal_.param(twistTopicName + "_udp", udpTwist, false);
+
         // Pull in the sensor's config, zero out values that are invalid for the twist type
         std::vector<int> twistUpdateVec = loadUpdateConfig(twistTopicName);
         std::fill(twistUpdateVec.begin() + POSITION_OFFSET, twistUpdateVec.begin() + POSITION_OFFSET + POSE_SIZE, 0);
@@ -1274,13 +1307,21 @@ namespace RobotLocalization
 
         if (twistUpdateSum > 0)
         {
+          ros::TransportHints hints;
+          hints.tcpNoDelay(nodelayTwist);
+
+          if (udpTwist)
+          {
+            hints.udp();
+          }
+
           const CallbackData callbackData(twistTopicName, twistUpdateVec, twistUpdateSum, false, false,
             twistMahalanobisThresh);
 
           topicSubs_.push_back(
             nh_.subscribe<geometry_msgs::TwistWithCovarianceStamped>(twistTopic, twistQueueSize,
               boost::bind(&RosFilter<T>::twistCallback, this, _1, callbackData, baseLinkFrameId_),
-              ros::VoidPtr(), ros::TransportHints().tcpNoDelay(nodelayTwist)));
+              ros::VoidPtr(), hints));
 
           twistVarCounts[StateMemberVx] += twistUpdateVec[StateMemberVx];
           twistVarCounts[StateMemberVy] += twistUpdateVec[StateMemberVy];
@@ -1410,6 +1451,9 @@ namespace RobotLocalization
         bool nodelayImu = false;
         nhLocal_.param(imuTopicName + "_nodelay", nodelayImu, false);
 
+        bool udpImu = false;
+        nhLocal_.param(imuTopicName + "_udp", udpImu, false);
+
         if (poseUpdateSum + twistUpdateSum + accelUpdateSum > 0)
         {
           const CallbackData poseCallbackData(imuTopicName + "_pose", poseUpdateVec, poseUpdateSum, differential,
@@ -1419,10 +1463,18 @@ namespace RobotLocalization
           const CallbackData accelCallbackData(imuTopicName + "_acceleration", accelUpdateVec, accelUpdateSum,
             differential, relative, accelMahalanobisThresh);
 
+          ros::TransportHints hints;
+          hints.tcpNoDelay(nodelayImu);
+
+          if (udpImu)
+          {
+            hints.udp();
+          }
+
           topicSubs_.push_back(
             nh_.subscribe<sensor_msgs::Imu>(imuTopic, imuQueueSize,
               boost::bind(&RosFilter<T>::imuCallback, this, _1, imuTopicName, poseCallbackData, twistCallbackData,
-                accelCallbackData), ros::VoidPtr(), ros::TransportHints().tcpNoDelay(nodelayImu)));
+                accelCallbackData), ros::VoidPtr(), hints));
         }
         else
         {
@@ -1505,16 +1557,19 @@ namespace RobotLocalization
       {
         if (absPoseVarCounts[static_cast<StateMembers>(stateVar)] > 1)
         {
-          std::stringstream stream;
-          stream <<  absPoseVarCounts[static_cast<StateMembers>(stateVar - POSITION_OFFSET)] <<
-              " absolute pose inputs detected for " << stateVariableNames_[stateVar] <<
-              ". This may result in oscillations. Please ensure that your variances for each "
-              "measured variable are set appropriately.";
+          if (!silence_multiple_absolute_pose_inputs_warning_)
+          {
+            std::stringstream stream;
+            stream <<  absPoseVarCounts[static_cast<StateMembers>(stateVar - POSITION_OFFSET)] <<
+                " absolute pose inputs detected for " << stateVariableNames_[stateVar] <<
+                ". This may result in oscillations. Please ensure that your variances for each "
+                "measured variable are set appropriately.";
 
-          addDiagnostic(diagnostic_msgs::DiagnosticStatus::WARN,
-                        stateVariableNames_[stateVar] + "_configuration",
-                        stream.str(),
-                        true);
+            addDiagnostic(diagnostic_msgs::DiagnosticStatus::WARN,
+                          stateVariableNames_[stateVar] + "_configuration",
+                          stream.str(),
+                          true);
+          }
         }
         else if (absPoseVarCounts[static_cast<StateMembers>(stateVar)] == 0)
         {
@@ -1876,6 +1931,16 @@ namespace RobotLocalization
       {
         if (filteredPosition.header.frame_id == odomFrameId_)
         {
+          if (invertTransform_)
+          {
+            tf2::Transform worldBaseLinkTrans;
+            tf2::fromMsg(worldBaseLinkTransMsg_.transform, worldBaseLinkTrans);
+            worldBaseLinkTransMsg_.transform = tf2::toMsg(worldBaseLinkTrans.inverse());
+            worldBaseLinkTransMsg_.child_frame_id = filteredPosition.header.frame_id;
+            worldBaseLinkTransMsg_.header.frame_id = filteredPosition.child_frame_id;
+            worldBaseLinkTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
+          }
+
           worldTransformBroadcaster_.sendTransform(worldBaseLinkTransMsg_);
         }
         else if (filteredPosition.header.frame_id == mapFrameId_)
@@ -1911,10 +1976,21 @@ namespace RobotLocalization
             mapOdomTrans.mult(worldBaseLinkTrans, baseLinkOdomTrans);
 
             geometry_msgs::TransformStamped mapOdomTransMsg;
-            mapOdomTransMsg.transform = tf2::toMsg(mapOdomTrans);
+
+            if (invertTransform_)
+            {
+              mapOdomTransMsg.transform = tf2::toMsg(mapOdomTrans.inverse());
+              mapOdomTransMsg.header.frame_id = odomFrameId_;
+              mapOdomTransMsg.child_frame_id = mapFrameId_;
+            }
+            else
+            {
+              mapOdomTransMsg.transform = tf2::toMsg(mapOdomTrans);
+              mapOdomTransMsg.header.frame_id = mapFrameId_;
+              mapOdomTransMsg.child_frame_id = odomFrameId_;
+            }
+
             mapOdomTransMsg.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
-            mapOdomTransMsg.header.frame_id = mapFrameId_;
-            mapOdomTransMsg.child_frame_id = odomFrameId_;
 
             worldTransformBroadcaster_.sendTransform(mapOdomTransMsg);
           }
@@ -1973,6 +2049,7 @@ namespace RobotLocalization
     ROS_INFO_STREAM("Received set_pose request with value\n" << *msg);
 
     std::string topicName("setPose");
+    enabled_ = true;
 
     // Get rid of any initial poses (pretend we've never had a measurement)
     initialMeasurements_.clear();
@@ -2038,6 +2115,23 @@ namespace RobotLocalization
     {
       ROS_INFO_STREAM("[" << ros::this_node::getName() << ":] Enabling filter...");
       enabled_ = true;
+    }
+    return true;
+  }
+
+  template<typename T>
+  bool RosFilter<T>::disableSrvCallback(std_srvs::Empty::Request& request, std_srvs::Empty::Response&)
+  {
+    RF_DEBUG("\n[" << ros::this_node::getName() << ":]" << " ------ /RosFilter::disableFilterSrvCallback ------\n");
+    if (enabled_)
+    {
+      ROS_INFO_STREAM("[" << ros::this_node::getName() << ":] Disabling filter...");
+      enabled_ = false;
+    }
+    else
+    {
+      ROS_WARN_STREAM("[" << ros::this_node::getName() << ":] Asking for disabling filter service, but the filter was "
+        "already disabled!");
     }
     return true;
   }
@@ -3025,6 +3119,7 @@ namespace RobotLocalization
     else
     {
       RF_DEBUG("Could not transform measurement into " << targetFrame << ". Ignoring...");
+      ROS_ERROR_STREAM("Could not transform measurement into " << targetFrame << " from " << msgFrame << ". Ignoring...");
     }
 
     RF_DEBUG("\n----- /RosFilter::prepareTwist (" << topicName << ") ------\n");
