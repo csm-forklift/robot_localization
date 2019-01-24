@@ -1885,8 +1885,17 @@ namespace RobotLocalization
 
     ros::Time curTime = ros::Time::now();
 
+    FilterState previousState;
+
     if (toggledOn_)
     {
+      // Save current state so we can revert back to it if the output state is invalid
+      previousState.state_ = Eigen::VectorXd(filter_.getState());
+      previousState.estimateErrorCovariance_ = Eigen::MatrixXd(filter_.getEstimateErrorCovariance());
+      previousState.lastMeasurementTime_ = filter_.getLastMeasurementTime();
+      previousState.latestControl_ = Eigen::VectorXd(filter_.getControl());
+      previousState.latestControlTime_ = filter_.getControlTime();
+
       // Now we'll integrate any measurements we've received if requested
       integrateMeasurements(curTime);
     }
@@ -1907,6 +1916,20 @@ namespace RobotLocalization
 
     if (getFilteredOdometryMessage(filteredPosition))
     {
+      if (!validateFilterOutput(filteredPosition))
+      {
+        ROS_ERROR_STREAM("Critical Error, NaNs were detected in the output state of the filter." <<
+              " This was likely due to poorly coniditioned process, noise, or sensor covariances." <<
+              " Reverting to previous state.");
+
+        filter_.setState(previousState.state_);
+        filter_.setEstimateErrorCovariance(previousState.estimateErrorCovariance_);
+        // FIXME we assume getFilteredOdometryMessage would be good; the validation check should actually happen inside
+        // the filter, on the state, not on the output message, so we can even detect that per measurement integration
+        // or state prediction
+        getFilteredOdometryMessage(filteredPosition);
+      }
+
       worldBaseLinkTransMsg_.transform = tf2::toMsg(tf2::Transform::getIdentity());
       worldBaseLinkTransMsg_.header.stamp = filteredPosition.header.stamp + tfTimeOffset_;
       worldBaseLinkTransMsg_.header.frame_id = filteredPosition.header.frame_id;
@@ -1918,12 +1941,6 @@ namespace RobotLocalization
       worldBaseLinkTransMsg_.transform.rotation = filteredPosition.pose.pose.orientation;
 
       // the filteredPosition is the message containing the state and covariances: nav_msgs Odometry
-
-      if (!validateFilterOutput(filteredPosition))
-      {
-        ROS_ERROR_STREAM("Critical Error, NaNs were detected in the output state of the filter." <<
-              " This was likely due to poorly coniditioned process, noise, or sensor covariances.");
-      }
 
       // If the worldFrameId_ is the odomFrameId_ frame, then we can just send the transform. If the
       // worldFrameId_ is the mapFrameId_ frame, we'll have some work to do.
