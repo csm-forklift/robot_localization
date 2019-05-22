@@ -1,0 +1,21 @@
+<launch>
+
+    <node pkg="sensors" type="twiststamped_to_covariance.py" name="twiststamped_to_covariance" output="screen">
+        <remap from="twist_covariance" to="velocity_conversion/twist"/>
+    </node>
+    
+    <node pkg="rosbag" type="play" name="rosbag_player" output="screen"
+        args="-r 2 $(find motion_testing)/localization_bags/angle_90_right_2019-05-15-11-32-15.bag">
+        <remap from="velocity_conversion/twist" to="twist_stamped"/>
+    </node>
+
+    <node pkg="robot_localization" type="ukf_localization_node" name="ukf_se" clear_params="true">
+        <rosparam command="load" file="$(find robot_localization)/params/ukf_forklift.yaml" />
+
+        <!--  Placeholder for output topic remapping
+        <remap from="odometry/filtered" to=""/>
+        <remap from="accel/filtered" to=""/>
+        -->
+
+    </node>
+</launch>
