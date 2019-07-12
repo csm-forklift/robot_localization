@@ -1,12 +1,42 @@
 <launch>
     
     <node pkg="rosbag" type="play" name="rosbag_player" output="screen"
-        args="-r 2 $(find motion_testing)/localization_bags/2019-06-08/angle_90_right_7kmh_2019-06-08-12-08-04.bag">
+        args="-r 2 $(find motion_testing)/localization_bags/2019-06-26/curve_3space_left_1kmh_2019-06-26-10-41-05.bag">
+        <!--
+        <remap from="/velocity_conversion/twist" to="velocity_conversion/twist_old" />
+        -->
+        <remap from="/arduino/imu0" to="/arduino/imu0_in" />
+        <remap from="/arduino/imu1" to="/arduino/imu1_in" />
+        
     </node>
+    
+    <!--
+    <node pkg="sensors" type="velocity_conversion" name="velocity_conversion">
+        <remap from="/velocity_conversion/twist" to="/velocity_conversion/twist_in" />
+    </node>
+    -->
+
+    
+    <node pkg="sensors" type="calculate_covariance.py" name="calculate_covariance">
+        <!--
+        <remap from="/calculate_covariance/twist" to="/velocity_conversion/twist" />
+        -->
+        <remap from="/calculate_covariance/imu0" to="/arduino/imu0" />
+        <remap from="/calculate_covariance/imu1" to="/arduino/imu1" />
+    </node>
+    
 
     <node pkg="robot_localization" type="ukf_localization_node" name="ukf_se" clear_params="true">
         <rosparam command="load" file="$(find robot_localization)/params/ukf_forklift.yaml" />
         <remap from="odometry/filtered" to="odom"/>
     </node>
+    
+    <!--
+    <node pkg="sensors" name="imu_viewer" type="imu_viewer">
+        <param name="imu_topic" value="/arduino/imu1"/>
+        <param name="origin_frame" value="odom"/>
+        <param name="imu_frame" value="imu0"/>
+    </node>
+    -->
     
 </launch>
