@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2
   tf2_geometry_msgs
   tf2_ros
+  tf
   xmlrpcpp)
 
 find_package(PkgConfig REQUIRED)
@@ -138,7 +139,7 @@ add_executable(ekf_localization_node src/ekf_localization_node.cpp)
 add_executable(ukf_localization_node src/ukf_localization_node.cpp)
 add_executable(navsat_transform_node src/navsat_transform_node.cpp)
 add_executable(robot_localization_listener_node src/robot_localization_listener_node.cpp)
-
+add_executable(odom_slam_node src/odom_slam_node.cpp)
 # Dependencies
 add_dependencies(filter_base ${PROJECT_NAME}_gencpp)
 add_dependencies(navsat_transform ${PROJECT_NAME}_gencpp)
@@ -162,7 +163,7 @@ target_link_libraries(ukf_localization_nodelet ros_filter ${catkin_LIBRARIES})
 target_link_libraries(navsat_transform filter_utilities ros_filter_utilities ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES})
 target_link_libraries(navsat_transform_node navsat_transform ${catkin_LIBRARIES})
 target_link_libraries(navsat_transform_nodelet navsat_transform ${catkin_LIBRARIES})
-
+target_link_libraries(odom_slam_node ${catkin_LIBRARIES})
 #############
 ## Install ##
 #############
